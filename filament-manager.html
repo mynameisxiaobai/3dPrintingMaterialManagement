@@ -1,0 +1,2128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>耗材库 · 3D打印原材料管理</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        oklch(11% 0.01 240);
+    --bg-2:      oklch(15% 0.012 240);
+    --bg-3:      oklch(19% 0.013 240);
+    --border:    oklch(28% 0.015 240);
+    --border-hi: oklch(38% 0.02 240);
+    --text-1:    oklch(93% 0.008 240);
+    --text-2:    oklch(68% 0.01 240);
+    --text-3:    oklch(48% 0.01 240);
+    --accent:    oklch(72% 0.18 185);
+    --accent-dim:oklch(40% 0.1 185);
+    --success:   oklch(72% 0.18 145);
+    --danger:    oklch(65% 0.22 25);
+    --warn:      oklch(78% 0.18 75);
+    --r: 8px;
+    --r-sm: 4px;
+    --r-lg: 14px;
+    font-size: 15px;
+  }
+
+  html, body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text-1);
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+  }
+
+  /* ── Noise texture overlay ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.4;
+  }
+
+  /* ── Layout ── */
+  .app { display: grid; grid-template-rows: auto 1fr; min-height: 100vh; }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    background: oklch(13% 0.01 240 / 0.9);
+    backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 100;
+    padding: 0 clamp(16px, 4vw, 48px);
+    display: flex; align-items: center; justify-content: space-between;
+    height: 60px;
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-1);
+    text-transform: uppercase;
+  }
+  .logo-icon {
+    width: 28px; height: 28px; border-radius: 6px;
+    background: linear-gradient(135deg, var(--accent) 0%, oklch(60% 0.2 280) 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+  }
+
+  .header-actions { display: flex; align-items: center; gap: 8px; }
+
+  /* ── Main content ── */
+  main { padding: clamp(20px, 4vw, 48px); max-width: 1400px; margin: 0 auto; width: 100%; }
+
+  /* ── Stats bar ── */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: 16px 20px;
+    transition: border-color 0.2s;
+  }
+  .stat-card:hover { border-color: var(--border-hi); }
+  .stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); margin-bottom: 6px; }
+  .stat-value { font-family: 'Space Mono', monospace; font-size: 1.6rem; font-weight: 700; color: var(--text-1); }
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.success { color: var(--success); }
+  .stat-value.warn { color: var(--warn); }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 20px; flex-wrap: wrap;
+  }
+
+  .search-wrap {
+    position: relative; flex: 1; min-width: 200px; max-width: 320px;
+  }
+  .search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-3); pointer-events: none; }
+  .search-input {
+    width: 100%; background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 8px 12px 8px 36px;
+    color: var(--text-1); font-family: inherit; font-size: 0.875rem;
+    outline: none; transition: border-color 0.2s;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text-3); }
+
+  .filter-group { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filter-btn {
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: var(--r-sm); padding: 7px 14px; cursor: pointer;
+    font-family: inherit; font-size: 0.8rem; font-weight: 500;
+    color: var(--text-2); transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: var(--border-hi); color: var(--text-1); }
+  .filter-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+  .spacer { flex: 1; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border-radius: var(--r); font-family: inherit;
+    font-size: 0.875rem; font-weight: 600; cursor: pointer;
+    border: none; transition: all 0.15s; text-decoration: none;
+  }
+  .btn-primary {
+    background: var(--accent); color: oklch(10% 0.01 240);
+  }
+  .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn-ghost {
+    background: transparent; color: var(--text-2);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--border-hi); color: var(--text-1); }
+
+  /* ── View toggle ── */
+  .view-toggle { display: flex; gap: 2px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 2px; }
+  .view-btn { background: none; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer; color: var(--text-3); transition: all 0.15s; }
+  .view-btn.active { background: var(--bg-3); color: var(--text-1); }
+  .view-btn svg { display: block; }
+
+  /* ── Grid view ── */
+  .filament-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+  }
+
+  /* ── Filament card ── */
+  .filament-card {
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: var(--r-lg); overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    cursor: pointer; position: relative;
+    container-type: inline-size;
+  }
+  .filament-card:hover {
+    border-color: var(--border-hi);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px oklch(0% 0 0 / 0.4);
+  }
+  .filament-card.out-of-stock { opacity: 0.55; }
+  .filament-card.out-of-stock:hover { opacity: 0.7; }
+
+  .card-swatch {
+    height: 100px; position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card-swatch::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to bottom, transparent 40%, oklch(0% 0 0 / 0.5) 100%);
+  }
+  .spool-icon {
+    width: 60px; height: 60px; position: relative; z-index: 1;
+    filter: drop-shadow(0 2px 8px oklch(0% 0 0 / 0.5));
+  }
+  .no-spool-badge {
+    position: absolute; top: 8px; right: 8px; z-index: 2;
+    background: oklch(0% 0 0 / 0.6); backdrop-filter: blur(4px);
+    border: 1px solid oklch(100% 0 0 / 0.15);
+    border-radius: 4px; padding: 3px 7px;
+    font-size: 0.65rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: oklch(80% 0 0);
+  }
+
+  .card-body { padding: 14px; }
+  .card-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 4px; }
+  .card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .card-brand { font-size: 0.72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
+  .card-material { font-size: 0.72rem; background: var(--bg-3); border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; color: var(--text-2); }
+
+  /* tag badges */
+  .card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .tag-badge {
+    display: inline-flex; align-items: center;
+    font-size: 0.62rem; color: var(--accent); font-weight: 600;
+    background: var(--accent-dim); padding: 1px 7px; border-radius: 8px;
+    border: 1px solid oklch(from var(--accent) l c h / 0.15);
+    line-height: 1.5;
+  }
+  .tag-badge.list-tag { font-size: 0.6rem; padding: 0px 6px; border-radius: 6px; line-height: 1.6; }
+
+  /* ══ Tag Panel ══ */
+  .tag-panel-backdrop {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: oklch(0% 0 0 / 0.55); backdrop-filter: blur(2px);
+  }
+  .tag-panel-backdrop.open { display: flex; align-items: center; justify-content: center; }
+  .tag-panel {
+    background: var(--bg-2); border: 1px solid var(--border-hi); border-radius: 14px;
+    width: 420px; max-height: 80vh; display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px oklch(0% 0 0 / 0.5); animation: fadeIn 0.2s ease-out;
+  }
+  .tag-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+  }
+  .tag-panel-title { font-size: 1rem; font-weight: 700; }
+  .tag-panel-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+  .tag-panel-add-row { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tag-panel-add-row input {
+    flex: 1; background: var(--bg-3); border: 1px solid var(--border);
+    border-radius: var(--r-sm); padding: 8px 12px; color: var(--text-1);
+    font-family: inherit; font-size: 0.85rem; outline: none;
+  }
+  .tag-panel-add-row input:focus { border-color: var(--accent); }
+  .tag-list-item {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 8px 10px; border-radius: var(--r-sm);
+    background: var(--bg-3); margin-bottom: 6px;
+    transition: background 0.15s;
+  }
+  .tag-list-item:hover { background: var(--bg-1); }
+  .tag-list-item-name {
+    font-size: 0.85rem; color: var(--text-1); flex: 1;
+    font-weight: 500;
+  }
+  .tag-list-item-count {
+    font-size: 0.7rem; color: var(--text-3); min-width: 30px; text-align: center;
+  }
+  .tag-list-item-actions { display: flex; gap: 4px; }
+  .tag-list-item-actions button {
+    background: none; border: 1px solid var(--border); border-radius: 4px;
+    padding: 3px 8px; font-size: 0.72rem; cursor: pointer; font-family: inherit;
+    color: var(--text-2); transition: all 0.15s;
+  }
+  .tag-list-item-actions button:hover { border-color: var(--border-hi); color: var(--text-1); }
+  .tag-list-item-actions .btn-tag-del:hover { border-color: var(--danger); color: var(--danger); }
+  .tag-edit-input {
+    flex: 1; background: var(--bg-1); border: 1px solid var(--accent);
+    border-radius: 4px; padding: 4px 8px; color: var(--text-1);
+    font-family: inherit; font-size: 0.85rem; outline: none;
+  }
+
+  /* ══ Tag Dropdown ══ */
+  .tag-select-wrap { position: relative; }
+  .tag-select-trigger {
+    display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+    min-height: 38px; padding: 6px 10px;
+    background: var(--bg-3); border: 1px solid var(--border);
+    border-radius: var(--r-sm); cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .tag-select-trigger:focus-within, .tag-select-trigger.open { border-color: var(--accent); }
+  .tag-select-placeholder {
+    font-size: 0.85rem; color: var(--text-3); user-select: none;
+  }
+  .tag-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 0.72rem; font-weight: 600;
+    background: var(--accent-dim); color: var(--accent);
+    padding: 2px 8px; border-radius: 10px;
+    border: 1px solid oklch(from var(--accent) l c h / 0.2);
+    animation: fadeIn 0.15s;
+  }
+  .tag-chip-remove {
+    cursor: pointer; font-size: 0.85rem; line-height: 1;
+    opacity: 0.6; transition: opacity 0.15s;
+  }
+  .tag-chip-remove:hover { opacity: 1; color: var(--danger); }
+  .tag-dropdown {
+    display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--bg-2); border: 1px solid var(--border-hi); border-radius: var(--r-sm);
+    box-shadow: 0 12px 40px oklch(0% 0 0 / 0.5); z-index: 50;
+    max-height: 200px; overflow-y: auto; animation: fadeIn 0.12s ease-out;
+  }
+  .tag-dropdown.open { display: block; }
+  .tag-dropdown-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; cursor: pointer; font-size: 0.82rem; color: var(--text-1);
+    transition: background 0.1s; user-select: none;
+  }
+  .tag-dropdown-item:hover { background: var(--bg-3); }
+  .tag-checkbox {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 15px; height: 15px; border-radius: 3px;
+    border: 1.5px solid var(--text-3); font-size: 11px; color: #fff;
+    flex-shrink: 0; transition: all 0.15s;
+  }
+  .tag-dropdown-item.checked .tag-checkbox {
+    background: var(--accent); border-color: var(--accent);
+  }
+  .tag-dropdown-empty { padding: 12px; text-align: center; color: var(--text-3); font-size: 0.8rem; }
+  .tag-dropdown-new {
+    display: flex; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--border);
+  }
+  .tag-dropdown-new input {
+    flex: 1; background: var(--bg-3); border: 1px solid var(--border);
+    border-radius: 4px; padding: 6px 10px; color: var(--text-1); font-size: 0.78rem;
+    font-family: inherit; outline: none;
+  }
+  .tag-dropdown-new input:focus { border-color: var(--accent); }
+  .tag-dropdown-new button {
+    background: var(--accent); color: #000; border: none; border-radius: 4px;
+    padding: 4px 10px; font-size: 0.75rem; font-weight: 600; cursor: pointer;
+    font-family: inherit; white-space: nowrap;
+  }
+
+  .card-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; border-top: 1px solid var(--border);
+    background: var(--bg-3);
+  }
+  .weight-display {
+    display: flex; align-items: baseline; gap: 3px;
+  }
+  .weight-num { font-family: 'Space Mono', monospace; font-size: 1rem; font-weight: 700; }
+  .weight-unit { font-size: 0.7rem; color: var(--text-3); }
+  .spool-status {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 0.72rem; font-weight: 500;
+  }
+  .spool-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor;
+  }
+  .spool-yes { color: var(--success); }
+  .spool-no  { color: var(--text-3); }
+
+  /* ── List view ── */
+  .filament-list { display: none; flex-direction: column; gap: 4px; }
+  .filament-list.visible { display: flex; }
+  .filament-grid.visible { display: grid; }
+  .filament-grid:not(.visible) { display: none; }
+
+  .list-item {
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: var(--r);
+    cursor: pointer; transition: border-color 0.15s;
+  }
+  .list-item:hover { border-color: var(--border-hi); }
+  .list-item.out-of-stock { opacity: 0.55; }
+
+  .list-swatch { width: 34px; height: 34px; border-radius: 6px; flex-shrink: 0; border: 2px solid oklch(100% 0 0 / 0.1); }
+  .list-name-col .list-name { font-weight: 600; font-size: 0.9rem; }
+  .list-name-col .list-brand { font-size: 0.72rem; color: var(--text-3); }
+  .list-material-badge { font-size: 0.75rem; background: var(--bg-3); border: 1px solid var(--border); border-radius: 3px; padding: 2px 8px; color: var(--text-2); text-align: center; }
+  .list-weight { font-family: 'Space Mono', monospace; font-size: 0.9rem; text-align: right; }
+  .list-qty { font-family: 'Space Mono', monospace; font-size: 0.9rem; font-weight: 700; text-align: center; }
+  .list-spool { text-align: center; }
+
+  .list-header {
+    display: grid; align-items: center;
+    grid-template-columns: 40px 24px 1fr 120px 80px 80px 90px 100px;
+    gap: 12px; padding: 8px 16px; margin-bottom: 2px;
+  }
+  .list-header span { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); font-weight: 500; }
+  .list-header .ta-r { text-align: right; }
+  .list-header .ta-c { text-align: center; }
+
+  .actions-cell { display: flex; gap: 4px; justify-content: flex-end; }
+  .act-btn {
+    background: none; border: 1px solid var(--border); border-radius: var(--r-sm);
+    padding: 4px 8px; cursor: pointer; color: var(--text-3); font-size: 0.75rem;
+    font-family: inherit; transition: all 0.15s; white-space: nowrap;
+  }
+  .act-btn:hover { border-color: var(--border-hi); color: var(--text-1); }
+  .act-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+  .act-btn.success:hover { border-color: var(--success); color: var(--success); }
+
+  /* ── Modal ── */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: oklch(0% 0 0 / 0.7);
+    backdrop-filter: blur(4px); z-index: 200;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .modal-backdrop.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--bg-2); border: 1px solid var(--border-hi);
+    border-radius: var(--r-lg); width: 100%; max-width: 520px;
+    box-shadow: 0 24px 80px oklch(0% 0 0 / 0.6);
+    transform: translateY(20px); transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .modal-backdrop.open .modal { transform: translateY(0); }
+
+  .modal-header {
+    padding: 20px 24px 0; display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-title { font-size: 1.1rem; font-weight: 700; }
+  .modal-close {
+    background: none; border: none; cursor: pointer; padding: 4px;
+    color: var(--text-3); transition: color 0.15s; border-radius: 4px;
+  }
+  .modal-close:hover { color: var(--text-1); background: var(--bg-3); }
+
+  .modal-body { padding: 20px 24px; display: grid; gap: 16px; }
+
+  .field { display: grid; gap: 6px; }
+  .field label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); font-weight: 500; }
+  .field input, .field select {
+    background: var(--bg-3); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 10px 12px;
+    color: var(--text-1); font-family: inherit; font-size: 0.9rem; outline: none;
+    transition: border-color 0.2s;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field select option { background: var(--bg-3); }
+
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .color-preview-row { display: flex; align-items: center; gap: 10px; }
+  .color-preview-swatch { width: 40px; height: 40px; border-radius: 8px; border: 2px solid oklch(100% 0 0 / 0.12); flex-shrink: 0; transition: background 0.2s; }
+  .color-input-wrap { flex: 1; position: relative; }
+  .color-input-wrap input[type="color"] {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;
+  }
+  .color-hex-input { width: 100%; }
+
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
+  .toggle-label { font-size: 0.9rem; color: var(--text-1); }
+  .toggle-sub { font-size: 0.75rem; color: var(--text-3); }
+  .toggle {
+    width: 44px; height: 24px; background: var(--bg-3); border: 1px solid var(--border);
+    border-radius: 12px; cursor: pointer; position: relative; transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 16px; height: 16px; border-radius: 50%; background: var(--text-3);
+    transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .toggle.on { background: var(--success); border-color: var(--success); }
+  .toggle.on::after { left: 23px; background: oklch(10% 0.01 240); }
+
+  .modal-footer {
+    padding: 0 24px 20px; display: flex; gap: 8px; justify-content: flex-end;
+  }
+
+  /* ── Batch step2 row hover ── */
+  [id^="batch"] .batch-row-del { transition: opacity 0.15s; }
+  #batchStep2Backdrop [style*="display:grid"] > div:hover .batch-row-del { opacity: 1 !important; }
+  #batchStep2Backdrop [style*="display:grid"] > div[style*="outline"] { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+  /* ── Color swatches picker ── */
+  .preset-colors { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .preset-color {
+    width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent; transition: all 0.15s;
+    box-shadow: 0 0 0 1px oklch(100% 0 0 / 0.1);
+  }
+  .preset-color:hover, .preset-color.sel { border-color: oklch(100% 0 0 / 0.7); transform: scale(1.15); }
+
+  /* ── Edit mode ── */
+  .btn-edit-mode {
+    background: transparent; color: var(--text-2);
+    border: 1px solid var(--border);
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: var(--r); font-family: inherit;
+    font-size: 0.875rem; font-weight: 600; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-edit-mode:hover { border-color: var(--border-hi); color: var(--text-1); }
+  .btn-edit-mode.active {
+    background: var(--accent-dim); border-color: var(--accent); color: var(--accent);
+  }
+
+  /* Batch delete bar */
+  .batch-bar {
+    display: none; align-items: center; gap: 12px;
+    background: oklch(22% 0.02 240); border: 1px solid var(--border-hi);
+    border-radius: var(--r); padding: 10px 16px; margin-bottom: 16px;
+    animation: fadeIn 0.2s ease-out;
+  }
+  .batch-bar.visible { display: flex; }
+  .batch-bar-text { font-size: 0.88rem; color: var(--text-2); flex: 1; }
+  .batch-bar-text strong { color: var(--accent); }
+  .btn-batch-delete {
+    background: var(--danger); color: #fff; border: none;
+    border-radius: var(--r-sm); padding: 6px 14px; font-family: inherit;
+    font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: filter 0.15s;
+  }
+  .btn-batch-delete:hover { filter: brightness(1.15); }
+  .btn-batch-delete:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-batch-clear {
+    background: none; border: 1px solid var(--border); color: var(--text-3);
+    border-radius: var(--r-sm); padding: 5px 12px; font-family: inherit;
+    font-size: 0.82rem; cursor: pointer; transition: all 0.15s;
+  }
+  .btn-batch-clear:hover { border-color: var(--border-hi); color: var(--text-1); }
+
+  /* Card select checkbox */
+  .card-checkbox {
+    position: absolute; top: 8px; left: 8px; z-index: 5;
+    width: 20px; height: 20px; border-radius: 5px;
+    border: 2px solid oklch(100% 0 0 / 0.35);
+    background: oklch(0% 0 0 / 0.5); backdrop-filter: blur(4px);
+    cursor: pointer; display: none; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .edit-mode .card-checkbox { display: flex; }
+  .card-checkbox.checked {
+    background: var(--accent); border-color: var(--accent);
+  }
+  .card-checkbox svg { opacity: 0; transition: opacity 0.1s; }
+  .card-checkbox.checked svg { opacity: 1; }
+
+  /* Card selected state */
+  .filament-card.selected {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px var(--accent-dim), 0 8px 30px oklch(0% 0 0 / 0.4);
+  }
+  /* in edit mode, clicking card selects, not edits */
+  .edit-mode .filament-card { cursor: default; }
+
+  /* List item checkbox */
+  .list-check-all {
+    width: 18px; height: 18px; border-radius: 4px;
+    border: 2px solid var(--border-hi); background: var(--bg-3);
+    cursor: pointer; appearance: none; -webkit-appearance: none;
+    transition: all 0.15s; display: inline-block;
+  }
+  .list-check-all:checked {
+    background: var(--accent); border-color: var(--accent);
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 12 12' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 6l3 3 5-5' stroke='%23000' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-size: 75%; background-repeat: no-repeat; background-position: center;
+  }
+  .list-check-all.indeterminate {
+    background: var(--accent); border-color: var(--accent);
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 12 12' xmlns='http://www.w3.org/2000/svg'%3E%3Cline x1='3' y1='6' x2='9' y2='6' stroke='%23000' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-size: 75%; background-repeat: no-repeat; background-position: center;
+  }
+  .list-checkbox {
+    width: 18px; height: 18px; border-radius: 4px;
+    border: 2px solid var(--border-hi); background: var(--bg-3);
+    cursor: pointer; appearance: none; -webkit-appearance: none;
+    transition: all 0.15s;
+  }
+  .list-checkbox:checked {
+    background: var(--accent); border-color: var(--accent);
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 12 12' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 6l3 3 5-5' stroke='%23000' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-size: 75%; background-repeat: no-repeat; background-position: center;
+  }
+  .list-item.selected { border-color: var(--accent); background: oklch(18% 0.02 185 / 0.5); }
+
+  /* edit mode: show card-del as edit btn instead */
+  .card-edit-overlay {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 4;
+    background: linear-gradient(to top, oklch(0% 0 0 / 0.75) 0%, transparent 100%);
+    padding: 20px 12px 10px;
+    display: none; gap: 6px; justify-content: flex-end;
+    pointer-events: none;
+  }
+  .edit-mode .filament-card:hover .card-edit-overlay { display: flex; pointer-events: auto; }
+  .card-action-btn {
+    background: oklch(0% 0 0 / 0.6); backdrop-filter: blur(4px);
+    border: 1px solid oklch(100% 0 0 / 0.15);
+    border-radius: 4px; padding: 5px 10px;
+    font-size: 0.72rem; cursor: pointer;
+    font-family: inherit; font-weight: 600; letter-spacing: 0.04em;
+    color: var(--text-1); transition: all 0.15s; line-height: 1;
+  }
+  .card-action-btn.del { color: var(--danger); }
+  .card-action-btn:hover { background: oklch(25% 0.02 240 / 0.9); }
+
+  /* ── Empty state ── */
+  .empty-state {
+    text-align: center; padding: 80px 20px;
+    color: var(--text-3); display: none; flex-direction: column; align-items: center; gap: 12px;
+  }
+  .empty-state.visible { display: flex; }
+  .empty-icon { font-size: 3rem; opacity: 0.5; }
+  .empty-title { font-size: 1rem; font-weight: 600; color: var(--text-2); }
+  .empty-sub { font-size: 0.85rem; max-width: 280px; }
+
+  /* ── Animations ── */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .filament-card, .list-item { animation: fadeIn 0.3s ease-out both; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
+
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .list-row, .list-header { grid-template-columns: 40px 24px 1fr 90px 70px 70px 70px; }
+    .actions-cell { display: none; }
+  }
+  @media (max-width: 600px) {
+    .filament-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .stats-bar { grid-template-columns: 1fr 1fr; }
+    .list-row, .list-header { grid-template-columns: 32px 20px 1fr 80px 60px; }
+    .list-material-badge, .list-weight, .list-spool, .actions-cell { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🧵</div>
+    耗材库
+  </div>
+  <div class="header-actions">
+    <button class="btn-edit-mode" id="tagManageBtn" onclick="openTagPanel()" style="background:none;border:1px solid var(--border);color:var(--text-2);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+      标签
+    </button>
+    <button class="btn-edit-mode" id="editModeBtn" onclick="toggleEditMode()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      编辑
+    </button>
+    <button class="btn btn-ghost" id="batchAddBtn" onclick="openBatchModal()" style="border:1px solid var(--border);color:var(--text-2);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7" opacity="0.4"/><rect x="3" y="14" width="7" height="7" opacity="0.4"/><rect x="14" y="14" width="7" height="7" opacity="0.4"/></svg>
+      批量添加
+    </button>
+    <button class="btn btn-primary" id="addBtn" onclick="openModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      添加耗材
+    </button>
+  </div>
+</header>
+
+<!-- ── Main ── -->
+<main>
+
+  <!-- Stats -->
+  <div class="stats-bar" id="statsBar"></div>
+
+  <!-- Batch bar -->
+  <div class="batch-bar" id="batchBar">
+    <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:0.82rem;color:var(--text-2);user-select:none">
+      <input type="checkbox" id="batchSelectAll" onclick="toggleSelectAll()" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer"> 全选
+    </label>
+    <span class="batch-bar-text" style="margin-left:8px">已选中 <strong id="selectedCount">0</strong> 条</span>
+    <span style="flex:1"></span>
+    <button class="btn-batch-clear" onclick="clearSelection()">取消选择</button>
+    <button class="btn-batch-delete" id="batchDeleteBtn" onclick="batchDelete()" disabled>批量删除</button>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input class="search-input" id="searchInput" placeholder="搜索耗材名称、品牌…" oninput="renderAll()">
+    </div>
+
+    <div class="filter-group" id="materialFilters"></div>
+    <div class="filter-group" id="tagFilters"></div>
+
+    <div class="spacer"></div>
+
+    <div class="filter-group">
+      <button class="filter-btn" id="filterAll" onclick="setStatusFilter('all')">全部</button>
+      <button class="filter-btn" id="filterInStock" onclick="setStatusFilter('instock')">有库存</button>
+      <button class="filter-btn" id="filterNoSpool" onclick="setStatusFilter('nospool')">无料盘</button>
+    </div>
+
+    <div class="view-toggle">
+      <button class="view-btn active" id="viewGrid" onclick="setView('grid')" title="网格视图">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      </button>
+      <button class="view-btn" id="viewList" onclick="setView('list')" title="列表视图">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Grid view -->
+  <div class="filament-grid visible" id="gridView"></div>
+
+  <!-- List view -->
+  <div class="filament-list" id="listView">
+    <div class="list-header">
+      <span></span>
+      <span style="display:flex;align-items:center;justify-content:center">
+        <input type="checkbox" class="list-check-all" id="listCheckAll" onclick="toggleSelectAll()" title="全选/取消全选">
+      </span>
+      <span>名称</span>
+      <span>材质</span>
+      <span class="ta-r">余量</span>
+      <span class="ta-c">数量</span>
+      <span class="ta-c">料盘</span>
+      <span></span>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div class="empty-state" id="emptyState">
+    <div class="empty-icon">🧵</div>
+    <div class="empty-title">暂无耗材</div>
+    <div class="empty-sub">点击右上角「添加耗材」，开始管理你的3D打印库存</div>
+  </div>
+
+</main>
+</div>
+
+<!-- ── Modal ── -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">添加耗材</div>
+      <button class="modal-close" onclick="closeModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+
+      <div class="field">
+        <label>颜色名称</label>
+        <input type="text" id="fName" placeholder="例：珊瑚红、宇宙黑、青柠绿…">
+      </div>
+
+      <div class="field">
+        <label>拓竹编号 <span style="font-size:0.7rem;color:var(--text-3);font-weight:400">（输入编号自动填充官方颜色）</span></label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="fBambuCode" placeholder="例：10200" maxlength="5" list="bambuDatalist"
+            style="flex:1;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text-1);font-family:'Space Mono',monospace;font-size:0.9rem;outline:none;transition:border-color 0.2s"
+            oninput="bambuLookup(this.value)"
+            onfocus="this.style.borderColor='var(--accent)'"
+            onblur="this.style.borderColor='var(--border)'">
+          <span id="bambuMatch" style="font-size:0.75rem;min-width:60px;display:none"></span>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>品牌</label>
+          <input type="text" id="fBrand" placeholder="拓竹、创想、Polymaker…">
+        </div>
+        <div class="field">
+          <label>材质</label>
+          <select id="fMaterial">
+            <option value="PLA">PLA</option>
+            <option value="PLA+">PLA+</option>
+            <option value="PETG">PETG</option>
+            <option value="ABS">ABS</option>
+            <option value="TPU">TPU</option>
+            <option value="ASA">ASA</option>
+            <option value="PC">PC</option>
+            <option value="SILK">SILK</option>
+            <option value="CF">CF 碳纤维</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>标签</label>
+        <div class="tag-select-wrap" id="tagSelectWrap">
+          <div class="tag-select-trigger" id="tagSelectTrigger" onclick="toggleTagDropdown('tagSelectWrap')">
+            <span class="tag-select-placeholder">选择标签…</span>
+          </div>
+          <div class="tag-dropdown" id="tagDropdown">
+            <div id="tagDropdownItems"></div>
+            <div class="tag-dropdown-new">
+              <input type="text" id="tagNewInput" placeholder="新建标签…" onkeydown="if(event.key==='Enter')addTagFromDropdown('tagSelectWrap')">
+              <button onclick="addTagFromDropdown('tagSelectWrap')">新增</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>颜色</label>
+        <div class="color-preview-row">
+          <div class="color-preview-swatch" id="colorSwatch" style="background:#e84040"></div>
+          <div class="color-input-wrap">
+            <input class="color-hex-input" type="text" id="fColorHex" value="#e84040" placeholder="#rrggbb" maxlength="7"
+              oninput="syncColorFromHex(this.value)" spellcheck="false">
+            <input type="color" id="fColorPicker" value="#e84040" oninput="syncColorFromPicker(this.value)">
+          </div>
+        </div>
+        <div class="preset-colors" id="presetColors"></div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>重量 (g)</label>
+          <input type="number" id="fWeight" value="1000" min="0" step="50" placeholder="1000">
+        </div>
+        <div class="field">
+          <label>数量(卷/种)</label>
+          <input type="number" id="fQty" value="1" min="0" step="1" placeholder="1">
+        </div>
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">有料盘</div>
+          <div class="toggle-sub">耗材是否附带完整料盘</div>
+        </div>
+        <div class="toggle on" id="toggleSpool" onclick="toggleSpoolState()"></div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="modalDeleteBtn" style="margin-right:auto;color:var(--danger);border-color:var(--danger);display:none" onclick="deleteFromModal()">删除</button>
+      <button class="btn btn-ghost" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveFilament()">保存</button>
+    </div>
+    <datalist id="bambuDatalist"></datalist>
+  </div>
+</div>
+
+<!-- ── Batch Add Modal ── -->
+<!-- ══════════════════════════════
+     Batch Add Step 1：输入
+══════════════════════════════ -->
+<!-- ══════════════════════════════
+     Batch Add Step 1：输入
+══════════════════════════════ -->
+<div class="modal-backdrop" id="batchModalBackdrop">
+  <div class="modal" style="max-width:580px" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">批量添加 — 输入</div>
+      <button class="modal-close" onclick="closeBatchModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>颜色名称（每行一个，或用中文/英文逗号分隔）</label>
+        <textarea id="batchNames" rows="6" style="width:100%;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text-1);font-family:inherit;font-size:0.9rem;outline:none;resize:vertical;transition:border-color 0.2s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'" placeholder="珊瑚红&#10;星云蓝&#10;极夜黑&#10;红色10200（接5位拓竹编号，自动匹配）&#10;10100（也可直接输入编号）"></textarea>
+        <div style="font-size:0.7rem;color:var(--text-3);margin-top:4px">末尾可接5位拓竹编号（如：红色10200），也可直接输入编号（如：10100）。系统将自动匹配官方颜色/品牌/材质</div>
+      </div>
+      <div class="field">
+        <label>标签（可选，所有条目共用）</label>
+        <div class="tag-select-wrap" id="batchTagSelectWrap">
+          <div class="tag-select-trigger" id="batchTagSelectTrigger" onclick="toggleTagDropdown('batchTagSelectWrap')">
+            <span class="tag-select-placeholder">选择标签…</span>
+          </div>
+          <div class="tag-dropdown" id="batchTagDropdown">
+            <div id="batchTagDropdownItems"></div>
+            <div class="tag-dropdown-new">
+              <input type="text" id="batchTagNewInput" placeholder="新建标签…" onkeydown="if(event.key==='Enter')addTagFromDropdown('batchTagSelectWrap')">
+              <button onclick="addTagFromDropdown('batchTagSelectWrap')">新增</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeBatchModal()">取消</button>
+      <button class="btn btn-primary" onclick="goBatchStep2()">下一步：确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     Batch Add Step 2：预览确认
+══════════════════════════════ -->
+<div class="modal-backdrop" id="batchStep2Backdrop" style="display:none">
+  <div class="modal" style="max-width:780px;max-height:92vh;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">批量添加 — 确认 <span id="batchStep2Count" style="font-size:0.78rem;color:var(--text-3);font-weight:400;margin-left:8px"></span></div>
+      <button class="modal-close" onclick="closeBatchStep2()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <!-- 工具栏 -->
+    <div id="batchToolbar" style="display:flex;align-items:center;gap:10px;padding:8px 24px;border-bottom:1px solid var(--border);background:var(--bg-3);font-size:0.75rem;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--text-2);user-select:none">
+        <input type="checkbox" id="batchSelectAll" onchange="toggleBatchSelectAll()" style="accent-color:var(--accent)"> 全选
+      </label>
+      <button class="btn btn-ghost btn-sm" id="batchDeleteBtn" onclick="deleteBatchSelected()" disabled style="color:var(--danger);border-color:oklch(from var(--danger) l c h / 0.3);padding:3px 10px;font-size:0.72rem">删除选中</button>
+      <span style="color:var(--text-3);margin:0 2px">|</span>
+      <span style="color:var(--text-2);white-space:nowrap">批量颜色</span>
+      <input type="color" id="batchColorInput" value="#e84040" style="width:26px;height:22px;border:none;border-radius:4px;cursor:pointer;background:var(--bg-2);padding:1px" title="批量设置颜色">
+      <button class="btn btn-ghost btn-sm" onclick="applyBatchColor()" style="padding:3px 10px;font-size:0.72rem">应用</button>
+      <span style="color:var(--text-3);margin:0 2px">|</span>
+      <span style="color:var(--text-2);white-space:nowrap">批量品牌</span>
+      <input type="text" id="batchBrandInput" placeholder="品牌名…" style="width:90px;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text-1);font-size:0.75rem;font-family:inherit;outline:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+      <button class="btn btn-ghost btn-sm" onclick="applyBatchBrand()" style="padding:3px 10px;font-size:0.72rem">应用</button>
+    </div>
+
+    <!-- 解析结果预览表格 -->
+    <div class="modal-body" style="flex:1;overflow:auto;max-height:42vh;padding:12px 24px">
+      <div id="batchPreviewTable" style="display:grid;gap:0"></div>
+      <div id="batchPreviewEmpty" style="text-align:center;color:var(--text-3);padding:32px 0;font-size:0.85rem;display:none">未识别到有效条目，请返回上一步修改输入</div>
+    </div>
+
+    <!-- 底部批量设置栏 -->
+    <div style="padding:10px 24px;border-top:1px solid var(--border);background:var(--bg-3);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:0.78rem;color:var(--text-2);white-space:nowrap">全部有料盘</span>
+      <div class="toggle on" id="batchStep2SpoolToggle" onclick="toggleBatchStep2Spool()"></div>
+      <span style="color:var(--text-3);margin:0 4px">|</span>
+      <span style="font-size:0.78rem;color:var(--text-2);white-space:nowrap">材质</span>
+      <select id="batchStep2Material" style="background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:4px 8px;color:var(--text-1);font-size:0.78rem;font-family:inherit;outline:none">
+        <option value="PLA">PLA</option>
+        <option value="PLA+">PLA+</option>
+        <option value="PETG">PETG</option>
+        <option value="ABS">ABS</option>
+        <option value="TPU">TPU</option>
+        <option value="ASA">ASA</option>
+        <option value="PC">PC</option>
+        <option value="SILK">SILK</option>
+        <option value="CF">CF 碳纤维</option>
+        <option value="其他">其他</option>
+      </select>
+      <span style="font-size:0.78rem;color:var(--text-2);white-space:nowrap">单卷(g)</span>
+      <input type="number" id="batchStep2Weight" value="1000" min="0" step="50" style="width:80px;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:4px 8px;color:var(--text-1);font-size:0.78rem;font-family:inherit;outline:none">
+      <span style="font-size:0.78rem;color:var(--text-2);white-space:nowrap">数量</span>
+      <input type="number" id="batchStep2Qty" value="1" min="0" step="1" style="width:68px;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:4px 8px;color:var(--text-1);font-size:0.78rem;font-family:inherit;outline:none">
+      <span style="font-size:0.78rem;color:var(--text-2);white-space:nowrap">品牌</span>
+      <input type="text" id="batchStep2Brand" placeholder="拓竹、创想…" style="width:100px;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:4px 8px;color:var(--text-1);font-size:0.78rem;font-family:inherit;outline:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="goBatchStep1()">返回修改</button>
+      <button class="btn btn-primary" onclick="saveBatchFilaments()">确认导入</button>
+    </div>
+  </div>
+</div>
+<!-- ── Tag Management Panel ── -->
+<div class="tag-panel-backdrop" id="tagPanelBackdrop" onclick="closeTagPanelBg(event)">
+  <div class="tag-panel" onclick="event.stopPropagation()">
+    <div class="tag-panel-header">
+      <div class="tag-panel-title">管理标签</div>
+      <button class="modal-close" onclick="closeTagPanel()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="tag-panel-body">
+      <div class="tag-panel-add-row">
+        <input type="text" id="newTagInput" placeholder="输入新标签名称…" onkeydown="if(event.key==='Enter')addNewTag()">
+        <button class="btn btn-primary" onclick="addNewTag()" style="padding:6px 14px;font-size:0.82rem">添加</button>
+      </div>
+      <div id="tagListContainer"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════
+   State
+══════════════════════════════ */
+let data = JSON.parse(localStorage.getItem('filaments') || 'null') || [
+  { id:1, name:'玉白', bambuCode:'10100', brand:'拓竹', material:'PLA', color:'#FFFFFF', weight:1000, qty:3, hasSpool:true, tags:['基础色','常用'] },
+  { id:2, name:'哑光海蓝', bambuCode:'11600', brand:'拓竹', material:'PLA', color:'#0078BF', weight:1000, qty:2, hasSpool:true, tags:['哑光','哑光蓝'] },
+  { id:3, name:'极夜黑', bambuCode:null, brand:'创想三维', material:'PETG', color:'#1a1a2e', weight:800, qty:1, hasSpool:false, tags:['功能性'] },
+  { id:4, name:'红色', bambuCode:'10200', brand:'拓竹', material:'PLA', color:'#C12E1F', weight:1000, qty:4, hasSpool:true, tags:['基础色','常用'] },
+  { id:5, name:'哑光猩红', bambuCode:'11200', brand:'拓竹', material:'PLA', color:'#DE4343', weight:1000, qty:1, hasSpool:true, tags:['哑光','哑光红','鲜艳'] },
+  { id:6, name:'橙焰', bambuCode:null, brand:'eSUN', material:'ABS', color:'#f97316', weight:800, qty:0, hasSpool:false, tags:['功能性','耐高温'] },
+  { id:7, name:'哑光丁香紫', bambuCode:'11700', brand:'拓竹', material:'PLA', color:'#AE96D4', weight:1000, qty:2, hasSpool:true, tags:['哑光','特殊色'] },
+  { id:8, name:'TPU 95A 红', bambuCode:'51200', brand:'拓竹', material:'TPU', color:'#C8102E', weight:600, qty:1, hasSpool:true, tags:['柔性','特殊色'] },
+];
+let nextId = Math.max(...data.map(d=>d.id), 0) + 1;
+
+let currentView = 'grid';
+let statusFilter = 'all';
+let materialFilter = 'all';
+let tagFilter = 'all';
+let editingId = null;
+let spoolState = true;
+let editMode = false;
+let selectedIds = new Set();
+let formTags = [];  // current modal's selected tags
+let editingTagName = null;  // inline edit state for tag panel
+
+const presetPalette = [
+  '#f0eee8','#e5e5e5','#1a1a2e','#ef4444','#f97316','#eab308',
+  '#22c55e','#10b981','#06b6d4','#3b82f6','#6366f1','#a855f7',
+  '#ec4899','#f43f5e','#84cc16','#8b5cf6','#14b8a6','#f59e0b',
+];
+
+/* ══════════════════════════════
+   Bambu Lab official filament database (167 entries)
+   [code, name, hex, materialGroup]
+══════════════════════════════ */
+const bambuFilaments = [
+  // PLA Basic (31)
+  ["10100","Jade White","#FFFFFF","PLA Basic"],["10101","Black","#000000","PLA Basic"],["10102","Silver","#A6A9AA","PLA Basic"],["10103","Gray","#8E9089","PLA Basic"],["10104","Light Gray","#D1D3D5","PLA Basic"],["10105","Dark Gray","#545454","PLA Basic"],
+  ["10200","Red","#C12E1F","PLA Basic"],["10201","Beige","#F7E6DE","PLA Basic"],["10202","Magenta","#EC008C","PLA Basic"],["10203","Pink","#F55A74","PLA Basic"],["10204","Hot Pink","#F5547C","PLA Basic"],["10205","Maroon Red","#9D2235","PLA Basic"],
+  ["10300","Orange","#FF6A13","PLA Basic"],["10301","Pumpkin Orange","#FF9016","PLA Basic"],
+  ["10400","Yellow","#F4EE2A","PLA Basic"],["10401","Gold","#E4BD68","PLA Basic"],["10402","Sunflower Yellow","#FEC600","PLA Basic"],
+  ["10501","Bambu Green","#00AE42","PLA Basic"],["10502","Mistletoe Green","#3F8E43","PLA Basic"],["10503","Bright Green","#BECF00","PLA Basic"],
+  ["10601","Blue","#0A2989","PLA Basic"],["10602","Blue Grey","#5B6579","PLA Basic"],["10603","Cyan","#0086D6","PLA Basic"],["10604","Cobalt Blue","#0056B8","PLA Basic"],["10605","Turquoise","#00B1B7","PLA Basic"],
+  ["10700","Purple","#5E43B7","PLA Basic"],["10701","Indigo Purple","#482960","PLA Basic"],
+  ["10800","Brown","#9D432C","PLA Basic"],["10801","Bronze","#847D48","PLA Basic"],["10802","Cocoa Brown","#6F5034","PLA Basic"],
+  // PLA Matte (26)
+  ["11100","Matte Ivory White","#FFFFFF","PLA Matte"],["11101","Matte Charcoal","#000000","PLA Matte"],["11102","Matte Ash Grey","#9B9EA0","PLA Matte"],["11103","Matte Bone White","#CBC6B8","PLA Matte"],["11104","Matte Nardo Gray","#757575","PLA Matte"],
+  ["11200","Matte Scarlet Red","#DE4343","PLA Matte"],["11201","Matte Sakura Pink","#E8AFCF","PLA Matte"],["11202","Matte Dark Red","#BB3D43","PLA Matte"],["11203","Matte Terracotta","#B15533","PLA Matte"],["11204","Matte Plum","#950051","PLA Matte"],
+  ["11300","Matte Mandarin Orange","#F99963","PLA Matte"],["11400","Matte Lemon Yellow","#F7D959","PLA Matte"],["11401","Matte Desert Tan","#E8DBB7","PLA Matte"],
+  ["11500","Matte Grass Green","#61C680","PLA Matte"],["11501","Matte Dark Green","#68724D","PLA Matte"],["11502","Matte Apple Green","#C2E189","PLA Matte"],
+  ["11600","Matte Marine Blue","#0078BF","PLA Matte"],["11601","Matte Ice Blue","#A3D8E1","PLA Matte"],["11602","Matte Dark Blue","#042F56","PLA Matte"],["11603","Matte Sky Blue","#56B7E6","PLA Matte"],
+  ["11700","Matte Lilac Purple","#AE96D4","PLA Matte"],
+  ["11800","Matte Latte Brown","#D3B7A7","PLA Matte"],["11801","Matte Dark Brown","#7D6556","PLA Matte"],["11802","Matte Dark Chocolate","#4D3324","PLA Matte"],["11803","Matte Caramel","#AE835B","PLA Matte"],
+  // PETG HF (14)
+  ["33100","PETG White","#FFFFFF","PETG HF"],["33101","PETG Gray","#ADB1B2","PETG HF"],["33102","PETG Black","#000000","PETG HF"],["33103","PETG Dark Gray","#515151","PETG HF"],["33200","PETG Red","#BC0900","PETG HF"],["33300","PETG Orange","#F75403","PETG HF"],
+  ["33400","PETG Yellow","#FFD00B","PETG HF"],["33401","PETG Cream","#F9DFB9","PETG HF"],["33500","PETG Green","#00AE42","PETG HF"],["33501","PETG Lime Green","#6EE53C","PETG HF"],["33502","PETG Forest Green","#39541A","PETG HF"],
+  ["33600","PETG Blue","#002E96","PETG HF"],["33601","PETG Lake Blue","#1F79E5","PETG HF"],["33801","PETG Peanut Brown","#875718","PETG HF"],
+  // ABS (11)
+  ["40100","ABS White","#FFFFFF","ABS"],["40101","ABS Black","#000000","ABS"],["40102","ABS Silver","#87909A","ABS"],["40200","ABS Red","#D32941","ABS"],["40300","ABS Orange","#FF6A13","ABS"],["40402","ABS Tangerine Yellow","#FFC72C","ABS"],
+  ["40500","ABS Bambu Green","#00AE42","ABS"],["40502","ABS Olive","#789D4A","ABS"],["40600","ABS Blue","#0A2CA5","ABS"],["40601","ABS Azure","#489FDF","ABS"],["40602","ABS Navy Blue","#0C2340","ABS"],
+  // ASA (6)
+  ["45100","ASA White","#FFFAF2","ASA"],["45101","ASA Black","#000000","ASA"],["45102","ASA Gray","#8A949E","ASA"],["45200","ASA Red","#E02928","ASA"],["45500","ASA Green","#00A6A0","ASA"],["45600","ASA Blue","#2140B4","ASA"],
+  // PLA Silk+ (14)
+  ["13108","Silk+ Titan Gray","#5F6367","PLA Silk+"],["13109","Silk+ Silver","#C8C8C8","PLA Silk+"],["13110","Silk+ White","#FFFFFF","PLA Silk+"],["13205","Silk+ Candy Red","#D02727","PLA Silk+"],["13206","Silk+ Rose Gold","#BA9594","PLA Silk+"],["13207","Silk+ Pink","#F7ADA6","PLA Silk+"],
+  ["13404","Silk+ Champagne","#F3CFB2","PLA Silk+"],["13405","Silk+ Gold","#F4A925","PLA Silk+"],["13506","Silk+ Candy Green","#018814","PLA Silk+"],["13507","Silk+ Mint","#96DCB9","PLA Silk+"],["13603","Silk+ Baby Blue","#A8C6EE","PLA Silk+"],["13604","Silk+ Blue","#008BDA","PLA Silk+"],
+  ["13702","Silk+ Purple","#8671CB","PLA Silk+"],
+  // PLA CF (7)
+  ["14100","PLA-CF Black","#000000","PLA CF"],["14101","PLA-CF Lava Gray","#4D5054","PLA CF"],["14200","PLA-CF Burgundy Red","#951E23","PLA CF"],["14500","PLA-CF Matcha Green","#5C9748","PLA CF"],["14600","PLA-CF Jeans Blue","#6E88BC","PLA CF"],["14601","PLA-CF Royal Blue","#2842AD","PLA CF"],["14700","PLA-CF Iris Purple","#69398E","PLA CF"],
+  // PLA Marble (2)
+  ["13103","White Marble","#F7F3F0","PLA Marble"],["13201","Red Granite","#AD4E38","PLA Marble"],
+  // PLA Wood (6)
+  ["13106","White Oak","#D6CCA3","PLA Wood"],["13107","Black Walnut","#4F3F24","PLA Wood"],["13204","Rosewood","#4C241C","PLA Wood"],["13403","Ochre Yellow","#C98935","PLA Wood"],["13505","Classic Birch","#918669","PLA Wood"],["13801","Clay Brown","#995F11","PLA Wood"],
+  // PLA Glow (5)
+  ["15200","Glow Pink","#F17B8F","PLA Glow"],["15300","Glow Orange","#FF9D5B","PLA Glow"],["15400","Glow Yellow","#F8FF80","PLA Glow"],["15500","Glow Green","#A1FFAC","PLA Glow"],["15600","Glow Blue","#7AC0E9","PLA Glow"],
+  // PLA Sparkle (6)
+  ["13101","Onyx Black Sparkle","#2D2B28","PLA Sparkle"],["13102","Slate Gray Sparkle","#8E9089","PLA Sparkle"],["13200","Crimson Red Sparkle","#792B36","PLA Sparkle"],["13402","Classic Gold Sparkle","#CEA629","PLA Sparkle"],["13501","Alpine Green Sparkle","#3F5443","PLA Sparkle"],["13700","Royal Purple Sparkle","#483D8B","PLA Sparkle"],
+  // TPU for AMS (7)
+  ["53100","TPU AMS White","#FFFFFF","TPU for AMS"],["53101","TPU AMS Black","#000000","TPU for AMS"],["53102","TPU AMS Gray","#939393","TPU for AMS"],["53200","TPU AMS Red","#ED0000","TPU for AMS"],["53400","TPU AMS Yellow","#F9EF41","TPU for AMS"],["53500","TPU AMS Neon Green","#90FF1A","TPU for AMS"],["53600","TPU AMS Blue","#5898DD","TPU for AMS"],
+  // TPU 95A HF (6)
+  ["51100","TPU 95A Black","#101820","TPU 95A HF"],["51101","TPU 95A Gray","#898D8D","TPU 95A HF"],["51102","TPU 95A White","#FFFFFF","TPU 95A HF"],["51200","TPU 95A Red","#C8102E","TPU 95A HF"],["51400","TPU 95A Yellow","#F3E600","TPU 95A HF"],["51600","TPU 95A Blue","#0072CE","TPU 95A HF"],
+  // PETG Translucent (9)
+  ["32100","PETG Translucent Gray","#8E8E8E","PETG Translucent"],["32101","PETG Translucent Clear","#FFFFFF","PETG Translucent"],["32200","PETG Translucent Pink","#F9C1BD","PETG Translucent"],["32300","PETG Translucent Orange","#FF911A","PETG Translucent"],["32500","PETG Translucent Olive","#748C45","PETG Translucent"],["32501","PETG Translucent Teal","#77EDD7","PETG Translucent"],["32600","PETG Translucent Light Blue","#61B0FF","PETG Translucent"],["32700","PETG Translucent Purple","#D6ABFF","PETG Translucent"],["32800","PETG Translucent Brown","#C9A381","PETG Translucent"],
+  // PETG CF (6)
+  ["31100","PETG-CF Black","#000000","PETG CF"],["31101","PETG-CF Titan Gray","#565656","PETG CF"],["31200","PETG-CF Brick Red","#9F332A","PETG CF"],["31500","PETG-CF Malachite Green","#16B08E","PETG CF"],["31600","PETG-CF Indigo Blue","#324585","PETG CF"],["31700","PETG-CF Violet Purple","#583061","PETG CF"],
+  // PLA Metal (5)
+  ["13100","Iron Gray Metallic","#43403D","PLA Metal"],["13400","Iridium Gold Metallic","#B39B84","PLA Metal"],["13500","Oxide Green Metallic","#1D7C6A","PLA Metal"],["13600","Cobalt Blue Metallic","#39699E","PLA Metal"],["13800","Copper Brown Metallic","#AA6443","PLA Metal"],
+  // PC (4)
+  ["60100","PC White","#FFFFFF","PC"],["60101","PC Black","#686865","PC"],["60102","PC Clear Black","#000000","PC"],["60103","PC Transparent","transparent","PC"],
+  // ABS-GF (8)
+  ["41100","ABS-GF White","#FFFFFF","ABS-GF"],["41101","ABS-GF Black","#000000","ABS-GF"],["41102","ABS-GF Gray","#C6C6C6","ABS-GF"],["41200","ABS-GF Red","#E83100","ABS-GF"],["41300","ABS-GF Orange","#F48438","ABS-GF"],["41400","ABS-GF Yellow","#FFE133","ABS-GF"],["41500","ABS-GF Green","#61BF36","ABS-GF"],["41600","ABS-GF Blue","#0C3B95","ABS-GF"],
+  // PA6-GF (7, skip empty hex)
+  ["72102","PA6-GF White","#EAEAE4","PA6-GF"],["72104","PA6-GF Black","#000000","PA6-GF"],["72103","PA6-GF Gray","#353533","PA6-GF"],["72200","PA6-GF Orange","#FF4800","PA6-GF"],["72400","PA6-GF Yellow","#FFCE00","PA6-GF"],["72500","PA6-GF Lime","#C5ED48","PA6-GF"],["72600","PA6-GF Blue","#75AED8","PA6-GF"],
+  // PLA Lite (9)
+  ["16100","Black","#000000","PLA Lite"],["16101","Gray","#9FA19F","PLA Lite"],["16103","White","#FFFEF7","PLA Lite"],
+  ["16200","Red","#FF0000","PLA Lite"],
+  ["16301","Orange","#FF671F","PLA Lite"],
+  ["16400","Yellow","#FFD834","PLA Lite"],
+  ["16501","Green","#00BB31","PLA Lite"],
+  ["16600","Cyan","#00FFFF","PLA Lite"],["16601","Blue","#004EA8","PLA Lite"],
+  // PETG Basic (15)
+  ["30105","Black","#000000","PETG Basic"],["30106","White","#FFFFFF","PETG Basic"],
+  ["30107","Gray","#9FA19F","PETG Basic"],
+  ["30201","Red","#C8102E","PETG Basic"],
+  ["30301","Orange","#FF671F","PETG Basic"],
+  ["30402","Yellow","#FFD834","PETG Basic"],["30403","Beige","#C4A882","PETG Basic"],
+  ["30502","Green","#00BB31","PETG Basic"],["30503","Dark Green","#1B4D3E","PETG Basic"],
+  ["30603","Dark Blue","#003DA5","PETG Basic"],["30604","Lake Blue","#0078BF","PETG Basic"],["30108","Blue Gray","#5B7C99","PETG Basic"],
+  ["30800","Dark Brown","#4F2C1D","PETG Basic"],
+];
+
+// Build lookup maps
+const bambuByCode = Object.fromEntries(bambuFilaments.map(f => [f[0], f]));
+const bambuByName  = {}; bambuFilaments.forEach(f => { bambuByName[f[1].toLowerCase()] = f; });
+const bambuCodes    = bambuFilaments.map(f => f[0]);
+
+// Chinese name mapping for all Bambu filaments
+const bambuNameCn = {
+  // PLA Basic
+  "Jade White":"玉白","White":"白色","Black":"黑色","Silver":"银色","Gray":"灰色","Light Gray":"浅灰色","Dark Gray":"深灰色",
+  "Red":"红色","Beige":"米色","Magenta":"品红色","Pink":"粉色","Hot Pink":"热粉色","Maroon Red":"栗红色",
+  "Orange":"橙色","Pumpkin Orange":"南瓜橙",
+  "Yellow":"黄色","Gold":"金色","Sunflower Yellow":"向日葵黄",
+  "Bambu Green":"拓竹绿","Green":"绿色","Mistletoe Green":"槲寄生绿","Bright Green":"亮绿色",
+  "Blue":"蓝色","Blue Grey":"蓝灰色","Cyan":"青色","Cobalt Blue":"钴蓝色","Turquoise":"青绿色",
+  "Purple":"紫色","Indigo Purple":"靛紫色",
+  "Brown":"棕色","Bronze":"古铜色","Cocoa Brown":"可可棕",
+  // PLA Matte
+  "Matte Ivory White":"哑光象牙白","Matte Charcoal":"哑光炭黑","Matte Ash Grey":"哑光灰","Matte Bone White":"哑光骨白","Matte Nardo Gray":"哑光纳多灰",
+  "Matte Scarlet Red":"哑光猩红","Matte Sakura Pink":"哑光樱花粉","Matte Dark Red":"哑光暗红","Matte Terracotta":"哑光陶土","Matte Plum":"哑光梅子",
+  "Matte Mandarin Orange":"哑光柑橘橙","Matte Lemon Yellow":"哑光柠檬黄","Matte Desert Tan":"哑光沙漠黄",
+  "Matte Grass Green":"哑光草绿","Matte Dark Green":"哑光暗绿","Matte Apple Green":"哑光苹果绿",
+  "Matte Marine Blue":"哑光海蓝","Matte Ice Blue":"哑光冰蓝","Matte Dark Blue":"哑光深蓝","Matte Sky Blue":"哑光天蓝",
+  "Matte Lilac Purple":"哑光丁香紫",
+  "Matte Latte Brown":"哑光拿铁棕","Matte Dark Brown":"哑光深棕","Matte Dark Chocolate":"哑光黑巧","Matte Caramel":"哑光焦糖",
+  // PETG HF
+  "PETG White":"PETG 白色","PETG Gray":"PETG 灰色","PETG Black":"PETG 黑色","PETG Dark Gray":"PETG 深灰",
+  "PETG Red":"PETG 红色","PETG Orange":"PETG 橙色",
+  "PETG Yellow":"PETG 黄色","PETG Cream":"PETG 奶油",
+  "PETG Green":"PETG 绿色","PETG Lime Green":"PETG 青柠绿","PETG Forest Green":"PETG 森林绿",
+  "PETG Blue":"PETG 蓝色","PETG Lake Blue":"PETG 湖蓝","PETG Peanut Brown":"PETG 花生棕",
+  // ABS
+  "ABS White":"ABS 白色","ABS Black":"ABS 黑色","ABS Silver":"ABS 银色",
+  "ABS Red":"ABS 红色","ABS Orange":"ABS 橙色","ABS Tangerine Yellow":"ABS 橘黄",
+  "ABS Bambu Green":"ABS 拓竹绿","ABS Olive":"ABS 橄榄绿",
+  "ABS Blue":"ABS 蓝色","ABS Azure":"ABS 天蓝","ABS Navy Blue":"ABS 海军蓝",
+  // ASA
+  "ASA White":"ASA 白色","ASA Black":"ASA 黑色","ASA Gray":"ASA 灰色",
+  "ASA Red":"ASA 红色","ASA Green":"ASA 绿色","ASA Blue":"ASA 蓝色",
+  // PLA Silk+
+  "Silk+ Titan Gray":"丝绸钛灰","Silk+ Silver":"丝绸银色","Silk+ White":"丝绸白色",
+  "Silk+ Candy Red":"丝绸糖果红","Silk+ Rose Gold":"丝绸玫瑰金","Silk+ Pink":"丝绸粉色",
+  "Silk+ Champagne":"丝绸香槟","Silk+ Gold":"丝绸金色",
+  "Silk+ Candy Green":"丝绸糖果绿","Silk+ Mint":"丝绸薄荷",
+  "Silk+ Baby Blue":"丝绸浅蓝","Silk+ Blue":"丝绸蓝色","Silk+ Purple":"丝绸紫色",
+  // PLA CF
+  "PLA-CF Black":"碳纤黑","PLA-CF Lava Gray":"碳纤熔岩灰","PLA-CF Burgundy Red":"碳纤酒红",
+  "PLA-CF Matcha Green":"碳纤抹茶绿","PLA-CF Jeans Blue":"碳纤牛仔蓝","PLA-CF Royal Blue":"碳纤皇家蓝","PLA-CF Iris Purple":"碳纤鸢尾紫",
+  // PLA Marble
+  "White Marble":"白色大理石","Red Granite":"红色花岗岩",
+  // PLA Wood
+  "White Oak":"白橡木","Black Walnut":"黑胡桃","Rosewood":"玫瑰木","Ochre Yellow":"赭黄色","Classic Birch":"经典桦木","Clay Brown":"黏土棕",
+  // PLA Glow
+  "Glow Pink":"夜光粉","Glow Orange":"夜光橙","Glow Yellow":"夜光黄","Glow Green":"夜光绿","Glow Blue":"夜光蓝",
+  // PLA Sparkle
+  "Onyx Black Sparkle":"玛瑙黑闪","Slate Gray Sparkle":"板岩灰闪","Crimson Red Sparkle":"深红闪",
+  "Classic Gold Sparkle":"经典金闪","Alpine Green Sparkle":"高山绿闪","Royal Purple Sparkle":"皇家紫闪",
+  // TPU for AMS
+  "TPU AMS White":"TPU AMS 白","TPU AMS Black":"TPU AMS 黑","TPU AMS Gray":"TPU AMS 灰",
+  "TPU AMS Red":"TPU AMS 红","TPU AMS Yellow":"TPU AMS 黄","TPU AMS Neon Green":"TPU AMS 霓虹绿","TPU AMS Blue":"TPU AMS 蓝",
+  // TPU 95A HF
+  "TPU 95A Black":"TPU 95A 黑","TPU 95A Gray":"TPU 95A 灰","TPU 95A White":"TPU 95A 白",
+  "TPU 95A Red":"TPU 95A 红","TPU 95A Yellow":"TPU 95A 黄","TPU 95A Blue":"TPU 95A 蓝",
+  // PETG Translucent
+  "PETG Translucent Gray":"PETG 半透灰","PETG Translucent Clear":"PETG 半透透明","PETG Translucent Pink":"PETG 半透粉",
+  "PETG Translucent Orange":"PETG 半透橙","PETG Translucent Olive":"PETG 半透橄榄","PETG Translucent Teal":"PETG 半透青",
+  "PETG Translucent Light Blue":"PETG 半透浅蓝","PETG Translucent Purple":"PETG 半透紫","PETG Translucent Brown":"PETG 半透棕",
+  // PETG CF
+  "PETG-CF Black":"PETG碳纤黑","PETG-CF Titan Gray":"PETG碳纤钛灰","PETG-CF Brick Red":"PETG碳纤砖红",
+  "PETG-CF Malachite Green":"PETG碳纤孔雀绿","PETG-CF Indigo Blue":"PETG碳纤靛蓝","PETG-CF Violet Purple":"PETG碳纤紫罗兰",
+  // PLA Metal
+  "Iron Gray Metallic":"金属铁灰","Iridium Gold Metallic":"金属铱金","Oxide Green Metallic":"金属氧化绿",
+  "Cobalt Blue Metallic":"金属钴蓝","Copper Brown Metallic":"金属铜棕",
+  // PC
+  "PC White":"PC 白色","PC Black":"PC 黑色","PC Clear Black":"PC 透黑","PC Transparent":"PC 透明",
+  // ABS-GF
+  "ABS-GF White":"ABS玻纤白","ABS-GF Black":"ABS玻纤黑","ABS-GF Gray":"ABS玻纤灰",
+  "ABS-GF Red":"ABS玻纤红","ABS-GF Orange":"ABS玻纤橙","ABS-GF Yellow":"ABS玻纤黄","ABS-GF Green":"ABS玻纤绿","ABS-GF Blue":"ABS玻纤蓝",
+  // PA6-GF
+  "PA6-GF White":"PA6玻纤白","PA6-GF Black":"PA6玻纤黑","PA6-GF Gray":"PA6玻纤灰",
+  "PA6-GF Orange":"PA6玻纤橙","PA6-GF Yellow":"PA6玻纤黄","PA6-GF Lime":"PA6玻纤青柠","PA6-GF Blue":"PA6玻纤蓝",
+  // PETG Basic
+  "Black":"黑色","White":"白色","Gray":"灰色",
+  "Red":"红色","Orange":"橙色","Yellow":"黄色","Beige":"米色",
+  "Green":"绿色","Dark Green":"墨绿色",
+  "Dark Blue":"深蓝色","Lake Blue":"湖蓝色","Blue Gray":"蓝灰色",
+  "Dark Brown":"深棕色",
+};
+
+const bambuNameToCn = (en) => bambuNameCn[en] || en;
+
+/* ══════════════════════════════
+   Tag system utilities
+══════════════════════════════ */
+function getAllTags() {
+  const map = new Map();
+  data.forEach(d => {
+    if (d.tags) d.tags.forEach(t => {
+      map.set(t, (map.get(t) || 0) + 1);
+    });
+  });
+  return Array.from(map.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+/* ── Tag Panel ── */
+function openTagPanel() {
+  document.getElementById('newTagInput').value = '';
+  editingTagName = null;
+  renderTagPanel();
+  document.getElementById('tagPanelBackdrop').classList.add('open');
+}
+function closeTagPanel() { document.getElementById('tagPanelBackdrop').classList.remove('open'); }
+function closeTagPanelBg(e) {
+  if (e.target === document.getElementById('tagPanelBackdrop')) closeTagPanel();
+}
+
+function renderTagPanel() {
+  const list = getAllTags();
+  const el = document.getElementById('tagListContainer');
+  if (!list.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:20px;font-size:0.85rem">暂无标签，输入上方添加</div>';
+    return;
+  }
+  el.innerHTML = list.map(([name, count]) => {
+    if (editingTagName === name) {
+      return `<div class="tag-list-item">
+        <input class="tag-edit-input" id="tagEditInput" value="${name}" onkeydown="if(event.key==='Enter')saveEditTag('${name.replace(/'/g,"\\'")}')" onblur="saveEditTag('${name.replace(/'/g,"\\'")}')">
+        <button class="btn btn-primary" style="padding:3px 10px;font-size:0.72rem" onclick="saveEditTag('${name.replace(/'/g,"\\'")}')">保存</button>
+      </div>`;
+    }
+    return `<div class="tag-list-item">
+      <span class="tag-badge" style="font-size:0.75rem;padding:2px 10px">${name}</span>
+      <span class="tag-list-item-count">${count}</span>
+      <div class="tag-list-item-actions">
+        <button onclick="startEditTag('${name.replace(/'/g,"\\'")}')">编辑</button>
+        <button class="btn-tag-del" onclick="deleteTagConfirm('${name.replace(/'/g,"\\'")}')">删除</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function addNewTag() {
+  const inp = document.getElementById('newTagInput');
+  const name = inp.value.trim();
+  if (!name) { inp.focus(); return; }
+  if (getAllTags().some(([t]) => t === name)) {
+    inp.value = ''; inp.focus(); return;
+  }
+  // just add to global pool ?doesn't automatically add to any filament
+  // since tags are independent of filaments, persist as a separate entry
+  savedTags.add(name);
+  inp.value = '';
+  inp.focus();
+  renderTagPanel();
+}
+
+function startEditTag(name) {
+  editingTagName = name;
+  renderTagPanel();
+  setTimeout(() => {
+    const inp = document.getElementById('tagEditInput');
+    if (inp) { inp.focus(); inp.select(); }
+  }, 50);
+}
+
+function saveEditTag(oldName) {
+  const inp = document.getElementById('tagEditInput');
+  if (!inp) { editingTagName = null; renderTagPanel(); return; }
+  const newName = inp.value.trim();
+  if (!newName || newName === oldName) { editingTagName = null; renderTagPanel(); return; }
+  // Rename tag across all filaments
+  data.forEach(d => {
+    if (d.tags) {
+      const idx = d.tags.indexOf(oldName);
+      if (idx !== -1) d.tags[idx] = newName;
+    }
+  });
+  save();
+  editingTagName = null;
+  renderTagPanel();
+  renderAll();
+}
+
+function deleteTagConfirm(name) {
+  const count = data.filter(d => d.tags && d.tags.includes(name)).length;
+  if (!confirm(`删除标签「${name}」？将影响${count} 条耗材记录。`)) return;
+  data.forEach(d => {
+    if (d.tags) d.tags = d.tags.filter(t => t !== name);
+  });
+  save();
+  renderTagPanel();
+  renderAll();
+}
+
+// Persistent saved tags (independent of filament data)
+let savedTags = new Set(JSON.parse(localStorage.getItem('savedTags') || '[]'));
+function persistSavedTags() {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('savedTags', JSON.stringify([...savedTags]));
+  }
+}
+
+/* ── Tag Dropdown ── */
+function toggleTagDropdown(wrapId) {
+  const wrap = document.getElementById(wrapId);
+  const dd = wrap.querySelector('.tag-dropdown');
+  const trigger = wrap.querySelector('.tag-select-trigger');
+  const isOpen = dd.classList.contains('open');
+  // Close all
+  document.querySelectorAll('.tag-dropdown.open').forEach(d => d.classList.remove('open'));
+  document.querySelectorAll('.tag-select-trigger.open').forEach(t => t.classList.remove('open'));
+  if (!isOpen) {
+    initTagDropdown(wrapId);
+    dd.classList.add('open');
+    trigger.classList.add('open');
+  }
+}
+
+function initTagDropdown(wrapId) {
+  const wrap = document.getElementById(wrapId);
+  const isBatch = wrapId === 'batchTagSelectWrap';
+  const itemsId = isBatch ? 'batchTagDropdownItems' : 'tagDropdownItems';
+  const itemsEl = document.getElementById(itemsId);
+  const allTags = getAllTags().map(([name]) => name);
+  // Merge savedTags
+  savedTags.forEach(t => { if (!allTags.includes(t)) allTags.push(t); });
+  allTags.sort((a, b) => a.localeCompare(b));
+
+  if (!allTags.length) {
+    itemsEl.innerHTML = '<div class="tag-dropdown-empty">暂无标签，在下方创建</div>';
+  } else {
+    itemsEl.innerHTML = allTags.map(t => {
+      const checked = formTags.includes(t);
+      return `<div class="tag-dropdown-item${checked ? ' checked' : ''}" onclick="toggleTag('${t.replace(/'/g,"\\'")}','${wrapId}')">
+        <span class="tag-checkbox">${checked ? '✓' : ''}</span>
+        ${t}
+      </div>`;
+    }).join('');
+  }
+}
+
+function toggleTag(name, wrapId) {
+  const idx = formTags.indexOf(name);
+  if (idx === -1) formTags.push(name); else formTags.splice(idx, 1);
+  // Add to savedTags if new
+  if (idx === -1 && !savedTags.has(name)) {
+    savedTags.add(name);
+    persistSavedTags();
+  }
+  renderTagChips(wrapId);
+  initTagDropdown(wrapId);
+  const wrap = document.getElementById(wrapId);
+  const dd = wrap.querySelector('.tag-dropdown');
+  dd.classList.add('open');
+  wrap.querySelector('.tag-select-trigger').classList.add('open');
+}
+
+function addTagFromDropdown(wrapId) {
+  const isBatch = wrapId === 'batchTagSelectWrap';
+  const inputId = isBatch ? 'batchTagNewInput' : 'tagNewInput';
+  const inp = document.getElementById(inputId);
+  const name = inp.value.trim();
+  if (!name) { inp.focus(); return; }
+  if (!formTags.includes(name)) {
+    formTags.push(name);
+    if (!savedTags.has(name)) { savedTags.add(name); persistSavedTags(); }
+  }
+  inp.value = '';
+  initTagDropdown(wrapId);
+  renderTagChips(wrapId);
+  const wrap = document.getElementById(wrapId);
+  wrap.querySelector('.tag-dropdown').classList.add('open');
+  wrap.querySelector('.tag-select-trigger').classList.add('open');
+  inp.focus();
+}
+
+function renderTagChips(wrapId) {
+  const wrap = document.getElementById(wrapId);
+  const trigger = wrap.querySelector('.tag-select-trigger');
+  const placeholder = trigger.querySelector('.tag-select-placeholder');
+  // Remove existing chips
+  trigger.querySelectorAll('.tag-chip').forEach(c => c.remove());
+  if (!formTags.length) {
+    placeholder.style.display = '';
+  } else {
+    placeholder.style.display = 'none';
+    formTags.forEach(t => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      chip.innerHTML = `${t}<span class="tag-chip-remove" onclick="event.stopPropagation();removeFormTag('${t.replace(/'/g,"\\'")}','${wrapId}')">×</span>`;
+      trigger.appendChild(chip);
+    });
+  }
+}
+
+function removeFormTag(name, wrapId) {
+  formTags = formTags.filter(t => t !== name);
+  renderTagChips(wrapId);
+  initTagDropdown(wrapId);
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.tag-select-wrap')) {
+    document.querySelectorAll('.tag-dropdown.open').forEach(d => d.classList.remove('open'));
+    document.querySelectorAll('.tag-select-trigger.open').forEach(t => t.classList.remove('open'));
+  }
+});
+
+/* ══════════════════════════════
+   Persistence
+══════════════════════════════ */
+function save() { localStorage.setItem('filaments', JSON.stringify(data)); }
+
+/* ══════════════════════════════
+   Helpers
+══════════════════════════════ */
+function luminance(hex) {
+  const r = parseInt(hex.slice(1,3),16)/255;
+  const g = parseInt(hex.slice(3,5),16)/255;
+  const b = parseInt(hex.slice(5,7),16)/255;
+  return 0.2126*r + 0.7152*g + 0.0722*b;
+}
+function textColor(hex) { return luminance(hex) > 0.4 ? '#111' : '#fff'; }
+
+function getMaterials() {
+  return [...new Set(data.map(d => d.material))].sort();
+}
+
+/* ══════════════════════════════
+   Stats
+══════════════════════════════ */
+function renderStats() {
+  const total = data.length;
+  const inStock = data.filter(d => d.qty > 0).length;
+  const totalKg = (data.reduce((s,d) => s + (d.weight * d.qty), 0) / 1000).toFixed(1);
+  const withSpool = data.filter(d => d.hasSpool).length;
+
+  document.getElementById('statsBar').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">耗材总数</div>
+      <div class="stat-value accent">${total}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">有库存</div>
+      <div class="stat-value success">${inStock}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">总重量</div>
+      <div class="stat-value">${totalKg} <span style="font-size:0.8rem;color:var(--text-3)">kg</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">有料盘</div>
+      <div class="stat-value warn">${withSpool}</div>
+    </div>
+  `;
+}
+
+/* ══════════════════════════════
+   Material filter buttons
+══════════════════════════════ */
+function renderMaterialFilters() {
+  const mats = getMaterials();
+  const wrap = document.getElementById('materialFilters');
+  wrap.innerHTML = `<button class="filter-btn ${materialFilter==='all'?'active':''}" onclick="setMaterialFilter('all')">全部材质</button>`;
+  mats.forEach(m => {
+    wrap.innerHTML += `<button class="filter-btn ${materialFilter===m?'active':''}" onclick="setMaterialFilter('${m}')">${m}</button>`;
+  });
+}
+
+function renderTagFilters() {
+  const tags = getAllTags();
+  const wrap = document.getElementById('tagFilters');
+  wrap.innerHTML = `<button class="filter-btn ${tagFilter==='all'?'active':''}" onclick="setTagFilter('all')">全部标签</button>`;
+  tags.forEach(([name, count]) => {
+    wrap.innerHTML += `<button class="filter-btn ${tagFilter===name?'active':''}" onclick="setTagFilter('${name}')">${name} <span style="font-size:0.68rem;color:var(--text-3);margin-left:2px">${count}</span></button>`;
+  });
+}
+
+function setMaterialFilter(v) { materialFilter = v; renderAll(); }
+function setTagFilter(v) { tagFilter = v; renderAll(); }
+function setStatusFilter(v) { statusFilter = v; renderAll(); }
+function setView(v) {
+  currentView = v;
+  document.getElementById('gridView').classList.toggle('visible', v==='grid');
+  document.getElementById('listView').classList.toggle('visible', v==='list');
+  document.getElementById('viewGrid').classList.toggle('active', v==='grid');
+  document.getElementById('viewList').classList.toggle('active', v==='list');
+  renderAll();
+}
+
+/* ══════════════════════════════
+   Filter & Sort
+══════════════════════════════ */
+function getFiltered() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  return data.filter(d => {
+    if (materialFilter !== 'all' && d.material !== materialFilter) return false;
+    if (tagFilter !== 'all' && (!d.tags || !d.tags.includes(tagFilter))) return false;
+    if (statusFilter === 'instock' && d.qty <= 0) return false;
+    if (statusFilter === 'nospool' && d.hasSpool) return false;
+    if (q && !d.name.toLowerCase().includes(q) && !d.brand.toLowerCase().includes(q) && !d.material.toLowerCase().includes(q) && (!d.tags || !d.tags.some(t => t.toLowerCase().includes(q)))) return false;
+    return true;
+  });
+}
+
+/* ══════════════════════════════
+   Spool SVG
+══════════════════════════════ */
+function spoolSvg(color, hasSpool) {
+  const tc = textColor(color);
+  const rim = `color-mix(in oklch, ${color} 70%, ${tc} 30%)`;
+  return `
+    <svg class="spool-icon" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+      <!-- outer rim -->
+      <circle cx="30" cy="30" r="28" fill="${color}" stroke="${color}" stroke-width="1"/>
+      <!-- rim ring -->
+      <circle cx="30" cy="30" r="28" fill="none" stroke="${tc}" stroke-width="3" opacity="0.15"/>
+      <!-- inner shadow -->
+      <circle cx="30" cy="30" r="22" fill="${tc}" opacity="0.07"/>
+      <!-- hub -->
+      <circle cx="30" cy="30" r="10" fill="${tc === '#fff' ? 'oklch(25% 0.01 240)' : 'oklch(88% 0.01 240)'}"/>
+      <!-- center bolt -->
+      <circle cx="30" cy="30" r="3" fill="${color}"/>
+      ${!hasSpool ? `<line x1="14" y1="46" x2="46" y2="14" stroke="red" stroke-width="3" stroke-linecap="round" opacity="0.85"/>` : ''}
+    </svg>
+  `;
+}
+
+/* ══════════════════════════════
+   Render grid
+══════════════════════════════ */
+function renderGrid(filtered) {
+  const el = document.getElementById('gridView');
+  if (!filtered.length) { el.innerHTML = ''; return; }
+  el.innerHTML = filtered.map((d, i) => `
+    <div class="filament-card ${d.qty===0?'out-of-stock':''} ${selectedIds.has(d.id)?'selected':''}" style="animation-delay:${i*0.03}s" onclick="handleCardClick(event,${d.id})">
+      <div class="card-checkbox ${selectedIds.has(d.id)?'checked':''}" onclick="event.stopPropagation();toggleSelect(${d.id})">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="oklch(10% 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6l3 3 5-5"/></svg>
+      </div>
+      <div class="card-swatch" style="background:${d.color}">
+        ${spoolSvg(d.color, d.hasSpool)}
+        ${!d.hasSpool ? '<div class="no-spool-badge">无料盘</div>' : ''}
+        <div class="card-edit-overlay">
+          <button class="card-action-btn" onclick="event.stopPropagation();editFilament(${d.id})">编辑</button>
+          <button class="card-action-btn del" onclick="event.stopPropagation();deleteFilament(${d.id})">删除</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-name">${d.name}</div>
+        <div class="card-meta">
+          <span class="card-brand">${d.brand}</span>
+          <span class="card-material">${d.material}</span>
+          ${d.bambuCode ? `<span style="font-size:0.65rem;color:var(--accent);font-family:'Space Mono',monospace;background:var(--accent-dim);padding:1px 5px;border-radius:3px">#${d.bambuCode}</span>` : ''}
+        </div>
+        ${d.tags && d.tags.length ? `<div class="card-tags">${d.tags.map(t => `<span class="tag-badge">${t}</span>`).join('')}</div>` : ''}
+      </div>
+      <div class="card-footer">
+        <div class="weight-display">
+          <span class="weight-num">${d.qty}</span>
+          <span class="weight-unit">×${d.weight}g</span>
+        </div>
+        <div class="spool-status ${d.hasSpool ? 'spool-yes' : 'spool-no'}">
+          <div class="spool-dot"></div>
+          ${d.hasSpool ? '有料盘' : '无料盘'}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ══════════════════════════════
+   Render list
+══════════════════════════════ */
+function renderList(filtered) {
+  const el = document.getElementById('listView');
+  const header = el.querySelector('.list-header');
+  [...el.querySelectorAll('.list-row')].forEach(r => r.remove());
+  if (!filtered.length) return;
+
+  filtered.forEach((d, i) => {
+    const row = document.createElement('div');
+    row.className = `list-row ${d.qty===0?'out-of-stock':''} ${selectedIds.has(d.id)?'selected':''}`;
+    row.style.animationDelay = `${i*0.025}s`;
+    row.innerHTML = `
+      <div class="list-swatch" style="background:${d.color}"></div>
+      <div class="list-check-cell">
+        <input type="checkbox" class="list-checkbox" ${selectedIds.has(d.id)?'checked':''} onchange="toggleSelect(${d.id})">
+      </div>
+      <div class="list-name-col">
+        <div class="list-name">${d.name} ${d.bambuCode ? `<span style="font-size:0.65rem;color:var(--accent);font-family:'Space Mono',monospace;background:var(--accent-dim);padding:1px 5px;border-radius:3px;vertical-align:middle">#${d.bambuCode}</span>` : ''}</div>
+        <div class="list-brand">${d.brand}</div>
+        ${d.tags && d.tags.length ? `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">${d.tags.map(t => `<span class="tag-badge list-tag">${t}</span>`).join('')}</div>` : ''}
+      </div>
+      <div class="list-material-badge">${d.material}</div>
+      <div class="list-weight" style="color:var(--text-2)">${d.weight}g</div>
+      <div class="list-qty" style="color:${d.qty===0?'var(--danger)':d.qty===1?'var(--warn)':'var(--text-1)'}">${d.qty}</div>
+      <div class="list-spool">
+        <span style="font-size:1rem">${d.hasSpool ? '✓' : '✗'}</span>
+      </div>
+      <div class="actions-cell">
+        <button class="act-btn" onclick="event.stopPropagation();adjustQty(${d.id},-1)">-</button>
+        <button class="act-btn" onclick="event.stopPropagation();adjustQty(${d.id},1)">+</button>
+        <button class="act-btn success" onclick="event.stopPropagation();editFilament(${d.id})">编辑</button>
+        <button class="act-btn danger" onclick="event.stopPropagation();deleteFilament(${d.id})">删除</button>
+      </div>
+    `;
+    row.addEventListener('click', e => {
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+      if (editMode) { toggleSelect(d.id); return; }
+      editFilament(d.id);
+    });
+    el.appendChild(row);
+  });
+}
+
+/* ══════════════════════════════
+   Render all
+══════════════════════════════ */
+function renderAll() {
+  renderStats();
+  renderMaterialFilters();
+  renderTagFilters();
+  const filtered = getFiltered();
+  renderGrid(filtered);
+  renderList(filtered);
+  const empty = document.getElementById('emptyState');
+  empty.classList.toggle('visible', filtered.length === 0);
+
+  // sync status filter buttons
+  document.getElementById('filterAll').classList.toggle('active', statusFilter==='all');
+  document.getElementById('filterInStock').classList.toggle('active', statusFilter==='instock');
+  document.getElementById('filterNoSpool').classList.toggle('active', statusFilter==='nospool');
+
+  if (editMode) updateBatchBar();
+}
+
+/* ══════════════════════════════
+   Edit mode & selection
+══════════════════════════════ */
+function toggleEditMode() {
+  editMode = !editMode;
+  selectedIds.clear();
+  const btn = document.getElementById('editModeBtn');
+  btn.classList.toggle('active', editMode);
+  btn.innerHTML = editMode
+    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>退出编辑`
+    : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>编辑`;
+  document.getElementById('gridView').classList.toggle('edit-mode', editMode);
+  document.getElementById('listView').classList.toggle('edit-mode', editMode);
+  document.getElementById('batchBar').classList.toggle('visible', editMode);
+  updateBatchBar();
+  renderAll();
+}
+
+function toggleSelect(id) {
+  if (selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  updateItemVisual(id);
+  updateBatchBar();
+}
+
+function clearSelection() {
+  selectedIds.forEach(id => updateItemVisual(id));
+  selectedIds.clear();
+  updateBatchBar();
+}
+
+function updateItemVisual(id) {
+  const checked = selectedIds.has(id);
+
+  /* 网格卡片 */
+  const cards = document.querySelectorAll('.filament-card');
+  cards.forEach(card => {
+    const btn = card.querySelector('.card-checkbox');
+    if (!btn) return;
+    // ?onclick 属性里提取 id
+    const match = card.getAttribute('onclick')?.match(/handleCardClick\(event,(\d+)\)/);
+    if (!match || parseInt(match[1]) !== id) return;
+    card.classList.toggle('selected', checked);
+    btn.classList.toggle('checked', checked);
+  });
+
+  /* 列表?*/
+  const rows = document.querySelectorAll('.list-row');
+  rows.forEach(row => {
+    const cb = row.querySelector('.list-checkbox');
+    if (!cb) return;
+    row.classList.toggle('selected', checked);
+    cb.checked = checked;
+  });
+}
+
+function updateBatchBar() {
+  const count = selectedIds.size;
+  document.getElementById('selectedCount').textContent = count;
+  document.getElementById('batchDeleteBtn').disabled = count === 0;
+
+  // Sync select-all checkboxes
+  const filtered = getFiltered();
+  const filteredIds = new Set(filtered.map(d => d.id));
+  const selInFiltered = filtered.filter(d => selectedIds.has(d.id));
+  const allChecked = filtered.length > 0 && selInFiltered.length === filtered.length;
+  const someChecked = selInFiltered.length > 0 && selInFiltered.length < filtered.length;
+
+  const updateCb = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.checked = allChecked;
+    el.indeterminate = someChecked;
+    el.classList.toggle('indeterminate', someChecked);
+  };
+  updateCb('batchSelectAll');
+  updateCb('listCheckAll');
+}
+
+function toggleSelectAll() {
+  const filtered = getFiltered();
+  const selInFiltered = filtered.filter(d => selectedIds.has(d.id));
+
+  if (selInFiltered.length === filtered.length && filtered.length > 0) {
+    // All selected ?deselect all in filtered view
+    filtered.forEach(d => selectedIds.delete(d.id));
+  } else {
+    // Select all in filtered view
+    filtered.forEach(d => selectedIds.add(d.id));
+  }
+
+  updateAllVisuals();
+  updateBatchBar();
+}
+
+function updateAllVisuals() {
+  // batch-update all grid cards
+  const cards = document.querySelectorAll('.filament-card');
+  cards.forEach(card => {
+    const btn = card.querySelector('.card-checkbox');
+    if (!btn) return;
+    const match = card.getAttribute('onclick')?.match(/handleCardClick\(event,(\d+)\)/);
+    if (!match) return;
+    const id = parseInt(match[1]);
+    const checked = selectedIds.has(id);
+    card.classList.toggle('selected', checked);
+    btn.classList.toggle('checked', checked);
+  });
+
+  // batch-update all list rows
+  const rows = document.querySelectorAll('.list-row');
+  rows.forEach(row => {
+    const cb = row.querySelector('.list-checkbox');
+    if (!cb) return;
+    // extract id from cb onchange attribute
+    const match = cb.getAttribute('onchange')?.match(/toggleSelect\((\d+)\)/);
+    if (!match) return;
+    const id = parseInt(match[1]);
+    const checked = selectedIds.has(id);
+    row.classList.toggle('selected', checked);
+    cb.checked = checked;
+  });
+}
+
+function batchDelete() {
+  if (selectedIds.size === 0) return;
+  if (!confirm(`确认删除选中的${selectedIds.size} 条耗材记录？此操作不可撤销。`)) return;
+  data = data.filter(x => !selectedIds.has(x.id));
+  selectedIds.clear();
+  save(); updateBatchBar(); renderAll();
+}
+
+/* ══════════════════════════════
+   Batch add
+══════════════════════════════ */
+
+/* ════════════════════════════
+   Batch add ?两步流程
+════════════════════════════ */
+
+let batchSpoolState = true;
+let batchStep2Spool = true;
+let batchParsed = [];
+let batchSelected = new Set();
+
+function openBatchModal() {
+  closeModal();
+  document.getElementById('batchNames').value = '';
+  formTags = [];
+  renderTagChips('batchTagSelectWrap');
+  document.getElementById('batchModalBackdrop').classList.add('open');
+}
+
+function closeBatchModal() { document.getElementById('batchModalBackdrop').classList.remove('open'); }
+
+function generateColor(baseHex, i, total) {
+  const hexToHsl = (h) => {
+    let r = parseInt(h.slice(1,3),16)/255, g = parseInt(h.slice(3,5),16)/255, b = parseInt(h.slice(5,7),16)/255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b), l = (max+min)/2;
+    if (max===min) return [0,0,l*100];
+    const d = max-min, s = l>0.5 ? d/(2-max-min) : d/(max+min);
+    let hue;
+    if (max===r) hue = ((g-b)/d+(g<b?6:0))/6;
+    else if (max===g) hue = ((b-r)/d+2)/6;
+    else hue = ((r-g)/d+4)/6;
+    return [hue*360, s*100, l*100];
+  };
+  const hslToHex = (h, s, l) => {
+    s/=100; l/=100;
+    const a = s*Math.min(l,1-l);
+    const f = n => { const k=(n+h/30)%12; return l-a*Math.max(Math.min(k-3,9-k,1),-1); };
+    const toH = v => Math.round(v*255).toString(16).padStart(2,'0');
+    return '#'+toH(f(0))+toH(f(8))+toH(f(4));
+  };
+  const [h, s, l] = hexToHsl(baseHex);
+  const step = total > 1 ? 360 / total : 0;
+  return hslToHex((h + step*i) % 360, s, l);
+}
+
+function goBatchStep2() {
+  const raw = document.getElementById('batchNames').value.trim();
+  if (!raw) { document.getElementById('batchNames').focus(); return; }
+
+  const rawNames = [...new Set(
+    raw.split(/[\n,，;；]+/).map(s => s.trim()).filter(Boolean)
+  )];
+  if (rawNames.length === 0) return;
+
+  const matMap = {
+    'PLA Basic':'PLA','PLA Matte':'PLA','PLA Silk+':'SILK','PLA CF':'CF 碳纤维','PLA Lite':'PLA',
+    'PLA Marble':'PLA','PLA Wood':'PLA','PLA Glow':'PLA','PLA Sparkle':'PLA','PLA Metal':'PLA',
+    'PETG Basic':'PETG','PETG HF':'PETG','PETG CF':'PETG','PETG Translucent':'PETG',
+    'ABS':'ABS','ABS-GF':'ABS','ASA':'ASA',
+    'TPU for AMS':'TPU','TPU 95A HF':'TPU',
+    'PC':'PC','PA6-GF':'其他',
+  };
+
+  batchParsed = rawNames.map(s => {
+    const m = s.match(/^(.*?)(\d{5})$/);
+    if (m) {
+      const code = m[2];
+      const b = bambuByCode[code];
+      if (b) {
+        const [_, bName, bHex, bMatGroup] = b;
+        return {
+          inputName: s, name: bambuNameToCn(bName), bambuCode: code,
+          color: bHex, material: matMap[bMatGroup] || 'PLA',
+          brand: '拓竹', fromBambu: true,
+        };
+      }
+      const fb = s.replace(/\d{5}$/, '').trim();
+      return { inputName: s, name: fb || s, bambuCode: null, color: null, material: null, brand: null, fromBambu: false };
+    }
+    return { inputName: s, name: s, bambuCode: null, color: null, material: null, brand: null, fromBambu: false };
+  });
+
+  const nonBambu = batchParsed.filter(p => !p.fromBambu);
+  nonBambu.forEach((p, i) => {
+    p.color = generateColor('#e84040', i, nonBambu.length);
+    p.material = p.material || 'PLA';
+    p.brand = p.brand || '';
+  });
+
+  batchSelected = new Set();
+  renderBatchStep2Preview();
+  document.getElementById('batchModalBackdrop').classList.remove('open');
+  document.getElementById('batchStep2Backdrop').style.display = 'flex';
+  setTimeout(() => document.getElementById('batchStep2Backdrop').classList.add('open'), 10);
+}
+
+function renderBatchStep2Preview() {
+  const wrap = document.getElementById('batchPreviewTable');
+  const empty = document.getElementById('batchPreviewEmpty');
+  document.getElementById('batchStep2Count').textContent = '共 ' + batchParsed.length + ' 条';
+  document.getElementById('batchSelectAll').checked = batchParsed.length > 0 && batchSelected.size === batchParsed.length;
+  document.getElementById('batchSelectAll').indeterminate = batchSelected.size > 0 && batchSelected.size < batchParsed.length;
+  document.getElementById('batchDeleteBtn').disabled = batchSelected.size === 0;
+
+  if (!batchParsed.length) {
+    wrap.style.display = 'none';
+    empty.style.display = '';
+    return;
+  }
+  wrap.style.display = 'grid';
+  empty.style.display = 'none';
+
+  const cols = '36px 1fr 110px 90px 100px';
+  let html = '<div style="display:grid;grid-template-columns:' + cols + ';gap:0;align-items:center;padding:4px 8px;font-size:0.7rem;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid var(--border)"><span></span><span>名称 / 色号</span><span style="text-align:center">颜色</span><span style="text-align:center">材质</span><span style="text-align:right">品牌</span></div>';
+  batchParsed.forEach((p, i) => {
+    const bg = p.fromBambu ? 'background:oklch(18% 0.01 240 / 0.5);' : '';
+    const selBg = batchSelected.has(i) ? 'outline:1px solid var(--accent);outline-offset:-1px;' : '';
+    const codeBadge = p.bambuCode ? '<span style="font-size:0.65rem;color:var(--accent);font-family:Space Mono,monospace;background:var(--accent-dim);padding:1px 5px;border-radius:3px;margin-left:6px">#' + p.bambuCode + '</span>' : '';
+    const inputNote = (p.fromBambu && p.inputName.replace(/\d{5}$/, '').trim() !== p.name)
+      ? '<div style="font-size:0.68rem;color:var(--text-3)">输入：' + p.inputName + '</div>' : '';
+    html += '<div style="display:grid;grid-template-columns:' + cols + ';gap:0;align-items:center;padding:4px 8px;font-size:0.82rem;border-bottom:1px solid var(--border);transition:background 0.15s;cursor:pointer;' + bg + selBg + '" onclick="if(event.target.tagName!==\'INPUT\'){toggleBatchSelect(' + i + ')}">'
+      + '<span style="text-align:center"><input type="checkbox" ' + (batchSelected.has(i) ? 'checked' : '') + ' onclick="event.stopPropagation();toggleBatchSelect(' + i + ')" style="accent-color:var(--accent)"></span>'
+      + '<div><span style="color:var(--text-1);font-weight:600">' + p.name + '</span>' + codeBadge + inputNote + '<button onclick="event.stopPropagation();deleteBatchItem(' + i + ')" style="border:none;background:none;color:var(--text-3);cursor:pointer;font-size:0.85rem;padding:0 4px;margin-left:4px;opacity:0;transition:opacity 0.15s" class="batch-row-del" title="删除此项">×</button></div>'
+      + '<div style="display:flex;align-items:center;justify-content:center;gap:4px"><div style="width:22px;height:22px;border-radius:5px;border:2px solid oklch(100% 0 0 / 0.12);background:' + p.color + ';flex-shrink:0"></div><span style="font-size:0.65rem;color:var(--text-3);font-family:Space Mono,monospace">' + p.color + '</span></div>'
+      + '<div style="text-align:center;color:var(--text-2);font-size:0.78rem">' + (p.material || '—') + '</div>'
+      + '<div style="text-align:right;color:var(--text-2);font-size:0.78rem">' + (p.brand || '—') + '</div>'
+      + '</div>';
+  });
+  wrap.innerHTML = html;
+}
+
+function toggleBatchSelectAll() {
+  const cb = document.getElementById('batchSelectAll');
+  if (cb.checked) {
+    batchParsed.forEach((_, i) => batchSelected.add(i));
+  } else {
+    batchSelected.clear();
+  }
+  renderBatchStep2Preview();
+}
+
+function toggleBatchSelect(i) {
+  if (batchSelected.has(i)) batchSelected.delete(i); else batchSelected.add(i);
+  renderBatchStep2Preview();
+}
+
+function deleteBatchItem(i) {
+  batchParsed.splice(i, 1);
+  batchSelected = new Set();
+  renderBatchStep2Preview();
+}
+
+function deleteBatchSelected() {
+  if (batchSelected.size === 0) return;
+  const indices = [...batchSelected].sort((a, b) => b - a);
+  indices.forEach(i => batchParsed.splice(i, 1));
+  batchSelected = new Set();
+  renderBatchStep2Preview();
+}
+
+function applyBatchColor() {
+  if (batchSelected.size === 0) return;
+  const color = document.getElementById('batchColorInput').value;
+  batchSelected.forEach(i => { batchParsed[i].color = color; });
+  renderBatchStep2Preview();
+}
+
+function applyBatchBrand() {
+  if (batchSelected.size === 0) return;
+  const brand = document.getElementById('batchBrandInput').value.trim();
+  if (!brand) return;
+  batchSelected.forEach(i => { batchParsed[i].brand = brand; });
+  renderBatchStep2Preview();
+}
+
+function toggleBatchStep2Spool() {
+  batchStep2Spool = !batchStep2Spool;
+  document.getElementById('batchStep2SpoolToggle').classList.toggle('on', batchStep2Spool);
+}
+
+function goBatchStep1() {
+  document.getElementById('batchStep2Backdrop').classList.remove('open');
+  setTimeout(() => { document.getElementById('batchStep2Backdrop').style.display = 'none'; }, 250);
+  document.getElementById('batchModalBackdrop').classList.add('open');
+}
+function closeBatchStep2() {
+  document.getElementById('batchStep2Backdrop').classList.remove('open');
+  setTimeout(() => { document.getElementById('batchStep2Backdrop').style.display = 'none'; }, 250);
+}
+
+function saveBatchFilaments() {
+  const brand   = document.getElementById('batchStep2Brand').value.trim();
+  const material = document.getElementById('batchStep2Material').value;
+  const weight   = parseInt(document.getElementById('batchStep2Weight').value) || 1000;
+  const qty     = parseInt(document.getElementById('batchStep2Qty').value) || 1;
+  const tags    = formTags.length ? [...formTags] : null;
+
+  batchParsed.forEach(p => {
+    const b = (p.brand && p.brand !== '—') ? p.brand : (brand || '未知');
+    const m = (p.material && p.material !== '—') ? p.material : material;
+    data.push({
+      id: nextId++,
+      name: p.name,
+      brand: b,
+      material: m,
+      color: p.color || '#e84040',
+      bambuCode: p.bambuCode || null,
+      weight, qty, tags,
+      hasSpool: batchStep2Spool,
+    });
+  });
+
+  save();
+  closeBatchStep2();
+  renderAll();
+}
+
+function handleCardClick(e, id) {
+  if (e.target.tagName === 'BUTTON') return;
+  if (editMode) { toggleSelect(id); return; }
+  editFilament(id);
+}
+function adjustQty(id, delta) {
+  const d = data.find(x => x.id === id);
+  if (!d) return;
+  d.qty = Math.max(0, d.qty + delta);
+  save(); renderAll();
+}
+
+function deleteFilament(id) {
+  if (!confirm('确认删除这条耗材记录?')) return;
+  data = data.filter(x => x.id !== id);
+  save(); renderAll();
+}
+
+function deleteFromModal() {
+  if (!editingId) return;
+  if (!confirm('确认删除这条耗材记录?')) return;
+  data = data.filter(x => x.id !== editingId);
+  save(); closeModal(); renderAll();
+}
+
+/* ══════════════════════════════
+   Modal
+══════════════════════════════ */
+function openModal(id = null) {
+  editingId = id;
+  spoolState = true;
+  document.getElementById('modalTitle').textContent = id ? '编辑耗材' : '添加耗材';
+
+  if (id) {
+    const d = data.find(x => x.id === id);
+    document.getElementById('fName').value = d.name;
+    document.getElementById('fBambuCode').value = d.bambuCode || '';
+    document.getElementById('fBrand').value = d.brand;
+    document.getElementById('fMaterial').value = d.material;
+    document.getElementById('fWeight').value = d.weight;
+    document.getElementById('fQty').value = d.qty;
+    formTags = d.tags ? [...d.tags] : [];
+    renderTagChips('tagSelectWrap');
+    spoolState = d.hasSpool;
+    setColor(d.color);
+  } else {
+    document.getElementById('fName').value = '';
+    document.getElementById('fBambuCode').value = '';
+    document.getElementById('fBrand').value = '';
+    document.getElementById('fMaterial').value = 'PLA';
+    document.getElementById('fWeight').value = '1000';
+    document.getElementById('fQty').value = '1';
+    formTags = [];
+    renderTagChips('tagSelectWrap');
+    setColor('#3b82f6');
+  }
+  document.getElementById('toggleSpool').classList.toggle('on', spoolState);
+  document.getElementById('modalDeleteBtn').style.display = id ? 'inline-flex' : 'none';
+  document.getElementById('bambuMatch').style.display = 'none';
+  // Populate datalist
+  const dl = document.getElementById('bambuDatalist');
+  dl.innerHTML = bambuFilaments.map(f => `<option value="${f[0]}">${bambuNameToCn(f[1])} — ${f[3]}</option>`).join('');
+  document.getElementById('modalBackdrop').classList.add('open');
+}
+
+function editFilament(id) { openModal(id); }
+
+function closeModal() { document.getElementById('modalBackdrop').classList.remove('open'); }
+function toggleSpoolState() {
+  spoolState = !spoolState;
+  document.getElementById('toggleSpool').classList.toggle('on', spoolState);
+}
+
+function saveFilament() {
+  const name = document.getElementById('fName').value.trim();
+  if (!name) { document.getElementById('fName').focus(); return; }
+
+  const tags = formTags.length ? [...formTags] : null;
+
+  const obj = {
+    id: editingId || nextId++,
+    name,
+    bambuCode: document.getElementById('fBambuCode').value.trim() || null,
+    brand: document.getElementById('fBrand').value.trim() || '未知',
+    material: document.getElementById('fMaterial').value,
+    color: document.getElementById('fColorHex').value || '#888888',
+    weight: parseInt(document.getElementById('fWeight').value) || 1000,
+    qty: parseInt(document.getElementById('fQty').value) || 0,
+    hasSpool: spoolState,
+    tags,
+  };
+
+  if (editingId) {
+    const idx = data.findIndex(x => x.id === editingId);
+    data[idx] = obj;
+  } else {
+    data.push(obj);
+  }
+
+  save(); closeModal(); renderAll();
+}
+
+/* ══════════════════════════════
+   Color helpers
+══════════════════════════════ */
+function setColor(hex) {
+  document.getElementById('fColorHex').value = hex;
+  document.getElementById('fColorPicker').value = hex;
+  document.getElementById('colorSwatch').style.background = hex;
+}
+function syncColorFromHex(v) {
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+    document.getElementById('fColorPicker').value = v;
+    document.getElementById('colorSwatch').style.background = v;
+  }
+}
+function syncColorFromPicker(v) {
+  document.getElementById('fColorHex').value = v;
+  document.getElementById('colorSwatch').style.background = v;
+}
+
+/* ══════════════════════════════
+   Bambu Lab code lookup
+══════════════════════════════ */
+function bambuLookup(code) {
+  const el = document.getElementById('bambuMatch');
+  code = code.trim();
+  if (!code) { el.style.display = 'none'; return; }
+
+  const match = bambuByCode[code];
+  if (match) {
+    const [_, name, hex, matGroup] = match;
+    document.getElementById('fName').value = bambuNameToCn(name);
+    document.getElementById('fBrand').value = '拓竹';
+    // Map material group to dropdown value
+    const matMap = {
+      'PLA Basic':'PLA','PLA Matte':'PLA','PLA Silk+':'SILK','PLA CF':'CF 碳纤维','PLA Lite':'PLA',
+      'PLA Marble':'PLA','PLA Wood':'PLA','PLA Glow':'PLA','PLA Sparkle':'PLA','PLA Metal':'PLA',
+      'PETG Basic':'PETG','PETG HF':'PETG','PETG CF':'PETG','PETG Translucent':'PETG',
+      'ABS':'ABS','ABS-GF':'ABS','ASA':'ASA',
+      'TPU for AMS':'TPU','TPU 95A HF':'TPU',
+      'PC':'PC','PA6-GF':'其他',
+    };
+    document.getElementById('fMaterial').value = matMap[matGroup] || 'PLA';
+    setColor(hex);
+    el.style.display = 'inline';
+    el.innerHTML = '<span style="color:var(--success);display:inline-flex;align-items:center;gap:4px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>'+bambuNameToCn(name)+'</span>';
+  } else {
+    el.style.display = 'inline';
+    el.innerHTML = '<span style="color:var(--text-3)">未匹配</span>';
+  }
+}
+
+/* ══════════════════════════════
+   Preset colors
+══════════════════════════════ */
+function buildPresetColors() {
+  const wrap = document.getElementById('presetColors');
+  wrap.innerHTML = presetPalette.map(c => `
+    <div class="preset-color" style="background:${c}" title="${c}" onclick="setColor('${c}')"></div>
+  `).join('');
+}
+
+/* ══════════════════════════════
+   Init
+══════════════════════════════ */
+buildPresetColors();
+renderAll();
+</script>
+</body>
+</html>
