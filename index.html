@@ -508,6 +508,45 @@
     font-size: 0.82rem; cursor: pointer; transition: all 0.15s;
   }
   .btn-batch-clear:hover { border-color: var(--border-hi); color: var(--text-1); }
+  .btn-batch-edit {
+    background: var(--accent); color: oklch(15% 0.01 240); border: none;
+    border-radius: var(--r-sm); padding: 6px 14px; font-family: inherit;
+    font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: filter 0.15s;
+  }
+  .btn-batch-edit:hover { filter: brightness(1.1); }
+  .btn-batch-edit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Batch edit modal ── */
+  .be-field {
+    display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: start;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .be-field:last-child { border-bottom: none; }
+  .be-field input[type="checkbox"] {
+    width: 18px; height: 18px; margin-top: 4px; accent-color: var(--accent); cursor: pointer;
+  }
+  .be-field-body { display: grid; gap: 6px; }
+  .be-field-body label {
+    font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-3); font-weight: 500;
+  }
+  .be-field-body label.disabled { opacity: 0.4; }
+  .be-field-body input, .be-field-body select {
+    background: var(--bg-3); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 8px 10px;
+    color: var(--text-1); font-family: inherit; font-size: 0.88rem; outline: none;
+    transition: border-color 0.2s, opacity 0.15s;
+  }
+  .be-field-body input:focus, .be-field-body select:focus { border-color: var(--accent); }
+  .be-field.unchecked .be-field-body input,
+  .be-field.unchecked .be-field-body select,
+  .be-field.unchecked .be-field-body .tag-select-trigger,
+  .be-field.unchecked .be-field-body .toggle { opacity: 0.4; pointer-events: none; }
+  .be-mode-row { display: flex; gap: 8px; font-size: 0.78rem; color: var(--text-2); align-items: center; }
+  .be-mode-row label { cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  .be-qty-row { display: flex; gap: 8px; align-items: center; }
+  .be-qty-row select { width: 90px; }
+  .be-qty-row input { flex: 1; }
 
   /* Card select checkbox */
   .card-checkbox {
@@ -658,6 +697,7 @@
     <span class="batch-bar-text" style="margin-left:8px">已选中 <strong id="selectedCount">0</strong> 条</span>
     <span style="flex:1"></span>
     <button class="btn-batch-clear" onclick="clearSelection()">取消选择</button>
+    <button class="btn-batch-edit" id="batchEditBtn" onclick="openBatchEditModal()" disabled>批量编辑</button>
     <button class="btn-batch-delete" id="batchDeleteBtn" onclick="batchDelete()" disabled>批量删除</button>
   </div>
 
@@ -668,6 +708,7 @@
       <input class="search-input" id="searchInput" placeholder="搜索耗材名称、品牌…" oninput="renderAll()">
     </div>
 
+    <div class="filter-group" id="brandFilters"></div>
     <div class="filter-group" id="materialFilters"></div>
     <div class="filter-group" id="tagFilters"></div>
 
@@ -730,8 +771,9 @@
     <div class="modal-body">
 
       <div class="field">
-        <label>颜色名称</label>
-        <input type="text" id="fName" placeholder="例：珊瑚红、宇宙黑、青柠绿…">
+        <label>颜色名称 <span style="font-size:0.7rem;color:var(--text-3);font-weight:400">（输入已知色名自动取色）</span></label>
+        <input type="text" id="fName" placeholder="例：珊瑚红、宇宙黑、开心果绿、莫兰迪紫…" oninput="autoColorFromName()">
+        <span id="fNameMatch" style="display:block;font-size:0.72rem;color:var(--success);margin-top:4px;min-height:1em"></span>
       </div>
 
       <div class="field">
@@ -749,7 +791,8 @@
       <div class="field-row">
         <div class="field">
           <label>品牌</label>
-          <input type="text" id="fBrand" placeholder="拓竹、创想、Polymaker…">
+          <input type="text" id="fBrand" list="brandDatalist" placeholder="拓竹、三绿、三慈、JAYO…" oninput="autoBrandFromName()">
+          <datalist id="brandDatalist"></datalist>
         </div>
         <div class="field">
           <label>材质</label>
@@ -844,7 +887,7 @@
     <div class="modal-body">
       <div class="field">
         <label>颜色名称（每行一个，或用中文/英文逗号分隔）</label>
-        <textarea id="batchNames" rows="6" style="width:100%;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text-1);font-family:inherit;font-size:0.9rem;outline:none;resize:vertical;transition:border-color 0.2s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'" placeholder="珊瑚红&#10;星云蓝&#10;极夜黑&#10;红色10200（接5位拓竹编号，自动匹配）&#10;10100（也可直接输入编号）"></textarea>
+        <textarea id="batchNames" rows="6" style="width:100%;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text-1);font-family:inherit;font-size:0.9rem;outline:none;resize:vertical;transition:border-color 0.2s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'" placeholder="三绿 开心果绿&#10;三慈 PETG 樱花粉&#10;维籁 莫兰迪紫&#10;JAYO 彩虹糖果色&#10;瑞鑫 丝绸亮金&#10;R3D 南瓜橙&#10;红色10200（接5位拓竹编号，自动匹配）&#10;10100（也可直接输入编号）&#10;&#10;支持：三绿/三慈/R3D/JAYO/瑞鑫/维籁 等20+品牌&#10;支持：200+ 中文/英文色名自动取色"></textarea>
         <div style="font-size:0.7rem;color:var(--text-3);margin-top:4px">末尾可接5位拓竹编号（如：红色10200），也可直接输入编号（如：10100）。系统将自动匹配官方颜色/品牌/材质</div>
       </div>
       <div class="field">
@@ -936,6 +979,120 @@
     </div>
   </div>
 </div>
+
+<!-- ── Batch Edit Modal ── -->
+<div class="modal-backdrop" id="batchEditBackdrop">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title">批量编辑</div>
+      <button class="modal-close" onclick="closeBatchEditModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:0.82rem;color:var(--text-2);background:var(--bg-3);border-radius:var(--r);padding:10px 12px;border:1px solid var(--border)">
+        将修改选中的 <strong id="beSelectedCount" style="color:var(--accent)">0</strong> 条耗材。勾选左侧方框才会应用对应字段，未勾选的保持原值。
+      </div>
+
+      <!-- 品牌 -->
+      <div class="be-field unchecked" id="beRowBrand">
+        <input type="checkbox" id="beApplyBrand" onclick="refreshBeFieldStates()">
+        <div class="be-field-body">
+          <label for="beApplyBrand">品牌</label>
+          <input type="text" id="beBrand" list="beBrandDatalist" placeholder="拓竹、三绿、三慈…" oninput="autoBrandFromNameBe()">
+          <datalist id="beBrandDatalist"></datalist>
+        </div>
+      </div>
+
+      <!-- 材质 -->
+      <div class="be-field unchecked" id="beRowMaterial">
+        <input type="checkbox" id="beApplyMaterial" onclick="refreshBeFieldStates()">
+        <div class="be-field-body">
+          <label for="beApplyMaterial">材质</label>
+          <select id="beMaterial">
+            <option value="">— 选择材质 —</option>
+            <option value="PLA">PLA</option>
+            <option value="PLA+">PLA+</option>
+            <option value="PETG">PETG</option>
+            <option value="ABS">ABS</option>
+            <option value="TPU">TPU</option>
+            <option value="ASA">ASA</option>
+            <option value="PC">PC</option>
+            <option value="SILK">SILK</option>
+            <option value="CF 碳纤维">CF 碳纤维</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 标签 -->
+      <div class="be-field unchecked" id="beRowTags">
+        <input type="checkbox" id="beApplyTags" onclick="refreshBeFieldStates()">
+        <div class="be-field-body">
+          <label for="beApplyTags">标签</label>
+          <div class="tag-select-wrap" id="beTagSelectWrap">
+            <div class="tag-select-trigger" onclick="toggleBeTagDropdown()">
+              <span class="tag-select-placeholder">选择或新建标签…</span>
+            </div>
+            <div class="tag-dropdown">
+              <div id="beTagDropdownItems"></div>
+              <div class="tag-dropdown-new">
+                <input type="text" id="beTagNewInput" placeholder="新建标签…" onkeydown="if(event.key==='Enter'){event.preventDefault();addBeTagFromInput()}">
+                <button onclick="addBeTagFromInput()">新增</button>
+              </div>
+            </div>
+          </div>
+          <div class="be-mode-row">
+            <span style="color:var(--text-3);margin-right:4px">模式：</span>
+            <label><input type="radio" name="beTagMode" value="add" checked onchange="setBeTagMode('add')"> 追加到原有标签</label>
+            <label><input type="radio" name="beTagMode" value="replace" onchange="setBeTagMode('replace')"> 替换原有标签</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 是否有料盘 -->
+      <div class="be-field unchecked" id="beRowSpool">
+        <input type="checkbox" id="beApplySpool" onclick="refreshBeFieldStates()">
+        <div class="be-field-body">
+          <label for="beApplySpool">是否有料盘</label>
+          <div class="toggle-row" style="padding:0">
+            <span class="toggle-sub">统一设置所有选中耗材的料盘状态</span>
+            <div class="toggle on" id="beSpoolToggle" onclick="toggleBeSpool()"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 数量 -->
+      <div class="be-field unchecked" id="beRowQty">
+        <input type="checkbox" id="beApplyQty" onclick="refreshBeFieldStates()">
+        <div class="be-field-body">
+          <label for="beApplyQty">数量</label>
+          <div class="be-qty-row">
+            <select id="beQtyMode">
+              <option value="set">设为</option>
+              <option value="add">增加</option>
+              <option value="sub">减少</option>
+            </select>
+            <input type="number" id="beQty" value="1" min="0" step="1" placeholder="数量">
+          </div>
+        </div>
+      </div>
+
+      <!-- 重量 -->
+      <div class="be-field unchecked" id="beRowWeight">
+        <input type="checkbox" id="beApplyWeight" onclick="refreshBeFieldStates()">
+        <div class="be-field-body">
+          <label for="beApplyWeight">重量 (g)</label>
+          <input type="number" id="beWeight" value="1000" min="0" step="50" placeholder="设为多少克">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeBatchEditModal()">取消</button>
+      <button class="btn btn-primary" onclick="applyBatchEdit()">应用修改</button>
+    </div>
+  </div>
+</div>
 <!-- ── Tag Management Panel ── -->
 <div class="tag-panel-backdrop" id="tagPanelBackdrop" onclick="closeTagPanelBg(event)">
   <div class="tag-panel" onclick="event.stopPropagation()">
@@ -975,6 +1132,7 @@ let currentView = 'grid';
 let statusFilter = 'all';
 let materialFilter = 'all';
 let tagFilter = 'all';
+let brandFilter = 'all';
 let editingId = null;
 let spoolState = true;
 let editMode = false;
@@ -1156,6 +1314,142 @@ const bambuNameCn = {
 };
 
 const bambuNameToCn = (en) => bambuNameCn[en] || en;
+
+/* ══════════════════════════════
+   品牌库 —— 识别输入中的品牌关键词
+   canonical: 标准品牌名    aliases: 可识别的写法
+═══════════════════════════════ */
+const brandDB = [
+  { canonical:'拓竹',aliases:['拓竹','bambu','bambulab','bambu lab',' Bambulab','树达','百乐'] },
+  { canonical:'三绿',aliases:['三绿','sunlu','三綠','sun lu'] },
+  { canonical:'三慈',aliases:['三慈','sanci','三慈科技'] },
+  { canonical:'R3D',aliases:['r3d','r3d filament','瑞鑫达'] },
+  { canonical:'JAYO',aliases:['jayo','佳友','佳友三维'] },
+  { canonical:'瑞鑫',aliases:['瑞鑫','ruixin','瑞鑫科技'] },
+  { canonical:'维籁',aliases:['维籁','weilai','维籁科技'] },
+  { canonical:'创想三维',aliases:['创想','创想三维','creality','创想三d'] },
+  { canonical:'eSUN',aliases:['esun','e sun','易加'] },
+  { canonical:'Polymaker',aliases:['polymaker','宝力马'] },
+  { canonical:'Raise3D',aliases:['raise3d','rise3d','锐尔'] },
+  { canonical:'闪铸',aliases:['闪铸','flashforge','forge'] },
+  { canonical:'余兄弟',aliases:['余兄弟','yub兄弟'] },
+  { canonical:'魔创',aliases:['魔创','mocreate'] },
+  { canonical:'耐力',aliases:['耐力','norry'] },
+  { canonical:'金力创',aliases:['金力创','jinlichuang'] },
+  { canonical:'恒鑫',aliases:['恒鑫','hengxin'] },
+  { canonical:'Makerbase',aliases:['makerbase','美凯'] },
+  { canonical:'QIDI',aliases:['qidi','奇笛'] },
+  { canonical:'Phrozen',aliases:['phrozen','光韵'] },
+];
+
+// 从任意字符串中识别品牌
+function detectBrand(text) {
+  if (!text) return null;
+  const s = String(text).toLowerCase().replace(/\s+/g,'');
+  let best = null, bestLen = 0;
+  for (const b of brandDB) {
+    for (const a of b.aliases) {
+      const al = a.toLowerCase().replace(/\s+/g,'');
+      if (s.includes(al) && al.length > bestLen) { best = b.canonical; bestLen = al.length; }
+    }
+  }
+  return best;
+}
+
+/* ══════════════════════════════
+   通用颜色库 —— 中文/英文色名 → HEX
+   用于非拓竹品牌耗材的自动配色
+═══════════════════════════════ */
+const colorDB = {
+  // ── 黑白灰 ──
+  '白色':'#FFFFFF','纯白':'#FFFFFF','原白':'#F9FDFF','原白色':'#F9FDFF','象牙白':'#FFFFF0',
+  '哑光原白':'#F7F6F2','哑光原白色':'#F7F6F2','哑光白':'#F5F5F0','瓷白':'#F4F9FF',
+  '骨白':'#EEE7D4','米白':'#F5F2E8','乳白':'#FFFBF0',
+  '黑色':'#000000','纯黑':'#000000','哑光黑':'#1A1A1A','极夜黑':'#1A1A2E','暗夜黑':'#28334A',
+  '灰色':'#808080','深灰':'#3A3A3C','浅灰':'#C0C0C0','哑光灰':'#9FA19F','银灰':'#63666A',
+  '黑色哑光':'#1A1A1A',
+  // ── 红粉 ──
+  '红色':'#C12E1F','正红':'#E60012','纯红':'#D6001C','大红':'#E53935','朱红':'#E34234',
+  '酒红':'#6D1A36','枣红':'#8C1C13','玫红':'#E0447C','粉红':'#FFC0CB','樱花粉':'#FFD1DC',
+  '樱花色':'#FFD1DC','桃粉':'#FFB7C5','珊瑚红':'#FF6F61','西瓜红':'#E63946',
+  '热粉色':'#FF6D9E','洋红':'#C72C71','品红':'#D5419E','桃红':'#F472B6',
+  '砖红':'#CB4154','砖红色':'#CB4154','赤红':'#C3272B','火红':'#E63329','胭脂':'#9D2933',
+  '豆沙红':'#C08081','藕荷色':'#C4A5B5','粉紫':'#E0B0FF','玫瑰粉':'#F7C6CE',
+  // ── 橙黄 ──
+  '橙色':'#FF7F27','南瓜橙':'#E8792B','阳光橙':'#FF8C54','橘色':'#FF8C00','橘黄':'#FAA61A',
+  '橙色哑光':'#E8792B','赤橙':'#FF4B00','杏色':'#FFE4C4','浅橙':'#FFCBA4',
+  '黄色':'#FCE300','明黄':'#EAC642','柠檬黄':'#F2F0A1','金黄':'#FFC300','鹅黄':'#FFF143',
+  '奶黄':'#F5E6A8','淡黄':'#FAF0C0',
+  // ── 绿 ──
+  '绿色':'#00BB31','深绿':'#1B4D3E','墨绿':'#1B4D3E','草绿':'#4CAF50','苹果绿':'#A8C63F',
+  '开心果绿':'#9DCB6E','嫩绿':'#C3E6A0','薄荷绿':'#00C7B1','青柠绿':'#C5ED48','柠檬绿':'#C5ED48',
+  '橄榄绿':'#5A6D3D','丛林绿':'#2E4D2B','军绿':'#4B5320','抹茶绿':'#B5C99A','豆绿':'#9ACD68',
+  '荧光绿':'#4AFF4F','翠绿':'#00C9A7','祖母绿':'#50C878',
+  // ── 蓝青 ──
+  '蓝色':'#0078BF','天蓝':'#87CEEB','湖蓝':'#0078BF','海蓝':'#0078BF','深蓝':'#003DA5',
+  '钴蓝':'#0047AB','克莱因蓝':'#1729AB','宝蓝':'#2E5AAC','孔雀蓝':'#00A4E1',
+  '冰蓝':'#AEEAFF','粉蓝':'#B0E0E6','灰蓝':'#5B7C99','蓝灰':'#5B7C99','藏青':'#1B2A4A',
+  '青色':'#00FFFF','蓝青':'#007FFF','青蓝':'#00A0C6','薄荷青':'#40E0D0',
+  // ── 紫 ──
+  '紫色':'#8B5FBF','莫兰迪紫':'#9B8FB3','薰衣草紫':'#685BC7','丁香紫':'#AE96D4',
+  '香芋紫':'#9B8FB3','浅紫':'#C9A9E0','深紫':'#5B2C8D','紫罗兰':'#8F5FBF',
+  '雪纺紫':'#D8C3E8','雾霾紫':'#8B7B8B',
+  // ── 棕/肤/木 ──
+  '棕色':'#8B5A2B','深棕':'#4F2C1D','咖啡色':'#6F4E37','巧克力':'#906557','浅棕':'#C19A6B',
+  '花生棕':'#8C6239','奶茶色':'#D9C2A3','摩卡':'#8B6F61','焦糖':'#B87333','肉桂':'#A9714B',
+  '肤色':'#F0D0B4','浅肤色':'#F7E0C8','蜜色':'#E8B888','象牙肤色':'#F3DCC3',
+  '原木色':'#C2B29A','橡木色':'#C2B29A','胡桃木':'#5B4636','木色':'#C19A6B','浅木色':'#DDC4A0',
+  // ── 金银/特殊 ──
+  '金色':'#D4AF37','亮金':'#FFD700','丝绸亮金':'#E6C36A','玫瑰金':'#B76E79','香槟金':'#F7E7CE',
+  '银色':'#C0C0C0','古铜':'#8B6914','铜色':'#B87333','珍珠白':'#F0F0F0','幻彩紫':'#B44FD4',
+  // ── 特殊效果 ──
+  '彩虹糖果色':'#F77F9F','彩虹':'#F77F9F','幻彩':'#8E7CFF','渐变':'#7FD8D0',
+  '夜光':'#D9F7F5','荧光黄':'#E8FF33','发光':'#D9F7F5','透明':'#E8F4F8','半透':'#DCE9EE',
+  '磨砂':'#E0E0DC','哑光':'#D8D8D4','亮光':'#F5F5F5','金属':'#B0B4BA',
+  '夜光绿':'#3DFF8A','夜光蓝':'#4DD9FF','夜光粉':'#FF8ECF','夜光黄':'#FFF36B','夜光紫':'#B07CFF',
+  // ── 英文名补充 ──
+  'black':'#000000','white':'#FFFFFF','red':'#C12E1F','blue':'#0078BF','green':'#00BB31',
+  'yellow':'#FCE300','orange':'#FF7F27','purple':'#8B5FBF','pink':'#FFC0CB','gray':'#808080',
+  'grey':'#808080','silver':'#C0C0C0','gold':'#D4AF37','brown':'#8B5A2B','cyan':'#00FFFF',
+  'magenta':'#D5419E','lime':'#C5ED48','navy':'#1B2A4A','teal':'#00A0C6','maroon':'#6D1A36',
+  'olive':'#5A6D3D','beige':'#F5F2E8','coral':'#FF6F61','salmon':'#FA8072','ivory':'#FFFFF0',
+  'khaki':'#C3B091','mint':'#00C7B1','lavender':'#685BC7','turquoise':'#40E0D0',
+  'violet':'#8F5FBF','indigo':'#4B0082','crimson':'#DC143C','tomato':'#FF6347',
+  'orchid':'#DA70D6','plum':'#8B4587','chocolate':'#906557','sandybrown':'#F4A460',
+  'honeydew':'#F0FFF0','seashell':'#FFF5EE','linen':'#FAF0E6','azure':'#007FFF',
+  'cerulean':'#2A52BE','skyblue':'#87CEEB','royalblue':'#4169E1','midnightblue':'#191970',
+};
+
+// 从任意字符串中识别颜色（返回 {name, hex} 或 null）
+function detectColor(text) {
+  if (!text) return null;
+  const raw = String(text);
+  // 长词优先：'哑光原白色' 应先于 '白色' 命中
+  const keys = Object.keys(colorDB).sort((a, b) => b.length - a.length);
+  for (const k of keys) {
+    if (raw.toLowerCase().includes(k.toLowerCase())) {
+      return { name: k, hex: colorDB[k] };
+    }
+  }
+  return null;
+}
+
+// 材质关键词识别
+const materialKeywords = [
+  ['PLA+', 'PLA'], ['PLA', 'PLA'], ['PETG', 'PETG'], ['ABS', 'ABS'], ['ASA', 'ASA'],
+  ['TPU', 'TPU'], ['PC', 'PC'], ['PA', '其他'], ['PA6', '其他'], ['PA6-GF', '其他'],
+  ['PVB', '其他'], ['PVA', '其他'], ['PLA-CF', 'CF 碳纤维'], ['PETG-CF', 'CF 碳纤维'],
+  ['ABS-GF', 'CF 碳纤维'], ['PA-CF', 'CF 碳纤维'], ['PE', '其他'], ['PP', '其他'],
+  ['尼龙', '其他'], ['蜡', '其他'], ['Stone', 'PLA'], [' Marble', 'PLA'], [' Wood', 'PLA'],
+];
+function detectMaterial(text) {
+  if (!text) return null;
+  const s = ' ' + String(text) + ' ';
+  for (const [kw, mat] of materialKeywords) {
+    if (s.toUpperCase().includes(kw.toUpperCase())) return mat;
+  }
+  return null;
+}
 
 /* ══════════════════════════════
    Tag system utilities
@@ -1396,6 +1690,15 @@ function getMaterials() {
   return [...new Set(data.map(d => d.material))].sort();
 }
 
+function getBrands() {
+  const map = new Map();
+  data.forEach(d => {
+    const b = (d.brand || '').trim() || '未知';
+    map.set(b, (map.get(b) || 0) + 1);
+  });
+  return Array.from(map.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
 /* ══════════════════════════════
    Stats
 ══════════════════════════════ */
@@ -1437,6 +1740,16 @@ function renderMaterialFilters() {
   });
 }
 
+function renderBrandFilters() {
+  const brands = getBrands();
+  const wrap = document.getElementById('brandFilters');
+  if (!wrap) return;
+  wrap.innerHTML = `<button class="filter-btn ${brandFilter==='all'?'active':''}" onclick="setBrandFilter('all')">全部品牌</button>`;
+  brands.forEach(([name, count]) => {
+    wrap.innerHTML += `<button class="filter-btn ${brandFilter===name?'active':''}" onclick="setBrandFilter('${name.replace(/'/g,"\\'")}')">${name} <span style="font-size:0.68rem;color:var(--text-3);margin-left:2px">${count}</span></button>`;
+  });
+}
+
 function renderTagFilters() {
   const tags = getAllTags();
   const wrap = document.getElementById('tagFilters');
@@ -1448,6 +1761,7 @@ function renderTagFilters() {
 
 function setMaterialFilter(v) { materialFilter = v; renderAll(); }
 function setTagFilter(v) { tagFilter = v; renderAll(); }
+function setBrandFilter(v) { brandFilter = v; renderAll(); }
 function setStatusFilter(v) { statusFilter = v; renderAll(); }
 function setView(v) {
   currentView = v;
@@ -1464,6 +1778,7 @@ function setView(v) {
 function getFiltered() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   return data.filter(d => {
+    if (brandFilter !== 'all' && ((d.brand || '未知') !== brandFilter)) return false;
     if (materialFilter !== 'all' && d.material !== materialFilter) return false;
     if (tagFilter !== 'all' && (!d.tags || !d.tags.includes(tagFilter))) return false;
     if (statusFilter === 'instock' && d.qty <= 0) return false;
@@ -1588,6 +1903,7 @@ function renderList(filtered) {
 ══════════════════════════════ */
 function renderAll() {
   renderStats();
+  renderBrandFilters();
   renderMaterialFilters();
   renderTagFilters();
   const filtered = getFiltered();
@@ -1664,6 +1980,8 @@ function updateBatchBar() {
   const count = selectedIds.size;
   document.getElementById('selectedCount').textContent = count;
   document.getElementById('batchDeleteBtn').disabled = count === 0;
+  const beBtn = document.getElementById('batchEditBtn');
+  if (beBtn) beBtn.disabled = count === 0;
 
   // Sync select-all checkboxes
   const filtered = getFiltered();
@@ -1737,6 +2055,218 @@ function batchDelete() {
 }
 
 /* ══════════════════════════════
+   Batch edit ── 批量修改已有耗材
+══════════════════════════════ */
+let beTags = [];          // 批量编辑面板当前选中的标签
+let beTagMode = 'add';    // 'add' = 追加, 'replace' = 替换
+
+function openBatchEditModal() {
+  if (selectedIds.size === 0) return;
+  // 重置所有字段为默认状态
+  beTags = [];
+  beTagMode = 'add';
+  formTags = [];  // 复用全局，但批量编辑用独立变量 beTags
+  ['beApplyBrand','beApplyMaterial','beApplyTags','beApplySpool','beApplyQty','beApplyWeight'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.checked = false;
+  });
+  // 重置输入值
+  ['beBrand','beQty','beWeight'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const matEl = document.getElementById('beMaterial');
+  if (matEl) matEl.selectedIndex = 0;
+  // 重置料盘 toggle 到「保持原状」语义：默认 on，但只有勾选 apply 才生效
+  const spoolEl = document.getElementById('beSpoolToggle');
+  if (spoolEl) spoolEl.classList.add('on');
+  // 标签模式默认追加
+  document.querySelectorAll('input[name="beTagMode"]').forEach(r => { r.checked = r.value === 'add'; });
+  // 刷新字段可用状态
+  refreshBeFieldStates();
+  // 填充品牌 datalist
+  const dl = document.getElementById('beBrandDatalist');
+  if (dl) dl.innerHTML = brandDB.map(b => `<option value="${b.canonical}">${b.aliases.slice(1, 4).join(' / ') || '—'}</option>`).join('');
+  // 重置标签 chips
+  renderBeTagChips();
+  // 显示选中数量
+  const cntEl = document.getElementById('beSelectedCount');
+  if (cntEl) cntEl.textContent = selectedIds.size;
+  // 打开 modal
+  document.getElementById('batchEditBackdrop').classList.add('open');
+}
+
+// 批量编辑面板：品牌输入规范化
+function autoBrandFromNameBe() {
+  const el = document.getElementById('beBrand');
+  if (!el) return;
+  const hit = detectBrand(el.value);
+  if (hit && hit !== el.value.trim()) el.value = hit;
+}
+
+function closeBatchEditModal() {
+  document.getElementById('batchEditBackdrop').classList.remove('open');
+  // 关闭可能打开的标签下拉
+  document.querySelectorAll('#batchEditBackdrop .tag-dropdown.open').forEach(d => d.classList.remove('open'));
+}
+
+function refreshBeFieldStates() {
+  ['Brand','Material','Tags','Spool','Qty','Weight'].forEach(field => {
+    const cb = document.getElementById('beApply' + field);
+    const row = document.getElementById('beRow' + field);
+    if (!cb || !row) return;
+    row.classList.toggle('unchecked', !cb.checked);
+  });
+}
+
+function toggleBeSpool() {
+  document.getElementById('beSpoolToggle').classList.toggle('on');
+}
+
+// 标签下拉：复用 formTags 机制但操作 beTags
+function toggleBeTagDropdown() {
+  const wrap = document.getElementById('beTagSelectWrap');
+  const dd = wrap.querySelector('.tag-dropdown');
+  const trigger = wrap.querySelector('.tag-select-trigger');
+  const isOpen = dd.classList.contains('open');
+  document.querySelectorAll('.tag-dropdown.open').forEach(d => d.classList.remove('open'));
+  document.querySelectorAll('.tag-select-trigger.open').forEach(t => t.classList.remove('open'));
+  if (!isOpen) {
+    initBeTagDropdown();
+    dd.classList.add('open');
+    trigger.classList.add('open');
+  }
+}
+
+function initBeTagDropdown() {
+  const itemsEl = document.getElementById('beTagDropdownItems');
+  const allTags = getAllTags().map(([name]) => name);
+  savedTags.forEach(t => { if (!allTags.includes(t)) allTags.push(t); });
+  allTags.sort((a, b) => a.localeCompare(b));
+  if (!allTags.length) {
+    itemsEl.innerHTML = '<div class="tag-dropdown-empty">暂无标签，在下方创建</div>';
+  } else {
+    itemsEl.innerHTML = allTags.map(t => {
+      const checked = beTags.includes(t);
+      return `<div class="tag-dropdown-item${checked ? ' checked' : ''}" onclick="toggleBeTag('${t.replace(/'/g,"\\'")}')">
+        <span class="tag-checkbox">${checked ? '✓' : ''}</span>
+        ${t}
+      </div>`;
+    }).join('');
+  }
+}
+
+function toggleBeTag(name) {
+  const idx = beTags.indexOf(name);
+  if (idx === -1) beTags.push(name); else beTags.splice(idx, 1);
+  if (idx === -1 && !savedTags.has(name)) { savedTags.add(name); persistSavedTags(); }
+  renderBeTagChips();
+  initBeTagDropdown();
+}
+
+function addBeTagFromInput() {
+  const inp = document.getElementById('beTagNewInput');
+  const name = inp.value.trim();
+  if (!name) return;
+  if (!beTags.includes(name)) {
+    beTags.push(name);
+    if (!savedTags.has(name)) { savedTags.add(name); persistSavedTags(); }
+  }
+  inp.value = '';
+  renderBeTagChips();
+  initBeTagDropdown();
+  const wrap = document.getElementById('beTagSelectWrap');
+  wrap.querySelector('.tag-dropdown').classList.add('open');
+  wrap.querySelector('.tag-select-trigger').classList.add('open');
+  inp.focus();
+}
+
+function removeBeTag(name) {
+  beTags = beTags.filter(t => t !== name);
+  renderBeTagChips();
+  initBeTagDropdown();
+}
+
+function renderBeTagChips() {
+  const wrap = document.getElementById('beTagSelectWrap');
+  const trigger = wrap.querySelector('.tag-select-trigger');
+  const placeholder = trigger.querySelector('.tag-select-placeholder');
+  trigger.querySelectorAll('.tag-chip').forEach(c => c.remove());
+  if (!beTags.length) {
+    placeholder.style.display = '';
+  } else {
+    placeholder.style.display = 'none';
+    beTags.forEach(t => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      chip.innerHTML = `${t}<span class="tag-chip-remove" onclick="event.stopPropagation();removeBeTag('${t.replace(/'/g,"\\'")}')">×</span>`;
+      trigger.appendChild(chip);
+    });
+  }
+}
+
+function setBeTagMode(mode) {
+  beTagMode = mode;
+}
+
+function applyBatchEdit() {
+  if (selectedIds.size === 0) return;
+  const apply = (id) => document.getElementById(id).checked;
+  let changed = 0;
+
+  const brandVal = (document.getElementById('beBrand').value.trim() || '').trim();
+  const matVal = document.getElementById('beMaterial').value;
+  const qtyMode = document.getElementById('beQtyMode').value;
+  const qtyVal = parseInt(document.getElementById('beQty').value) || 0;
+  const weightVal = parseInt(document.getElementById('beWeight').value) || 0;
+  const spoolOn = document.getElementById('beSpoolToggle').classList.contains('on');
+
+  data.forEach(d => {
+    if (!selectedIds.has(d.id)) return;
+    let touched = false;
+    if (apply('beApplyBrand') && brandVal) {
+      d.brand = brandVal; touched = true;
+    }
+    if (apply('beApplyMaterial') && matVal) {
+      d.material = matVal; touched = true;
+    }
+    if (apply('beApplyTags') && beTags.length) {
+      if (beTagMode === 'replace') {
+        d.tags = [...beTags];
+      } else {
+        d.tags = d.tags || [];
+        beTags.forEach(t => { if (!d.tags.includes(t)) d.tags.push(t); });
+      }
+      if (!d.tags.length) d.tags = null;
+      touched = true;
+    }
+    if (apply('beApplySpool')) {
+      d.hasSpool = spoolOn; touched = true;
+    }
+    if (apply('beApplyQty')) {
+      if (qtyMode === 'set') d.qty = qtyVal;
+      else if (qtyMode === 'add') d.qty = Math.max(0, (d.qty || 0) + qtyVal);
+      else if (qtyMode === 'sub') d.qty = Math.max(0, (d.qty || 0) - qtyVal);
+      touched = true;
+    }
+    if (apply('beApplyWeight') && weightVal > 0) {
+      d.weight = weightVal; touched = true;
+    }
+    if (touched) changed++;
+  });
+
+  if (changed === 0) {
+    alert('没有勾选任何要修改的字段');
+    return;
+  }
+  save();
+  closeBatchEditModal();
+  renderAll();
+  // 不清除选中，方便连续操作；只刷新 batch bar
+  updateBatchBar();
+}
+
+/* ══════════════════════════════
    Batch add
 ══════════════════════════════ */
 
@@ -1802,29 +2332,67 @@ function goBatchStep2() {
   };
 
   batchParsed = rawNames.map(s => {
+    // 1) 先尝试拓竹编号识别
     const m = s.match(/^(.*?)(\d{5})$/);
     if (m) {
       const code = m[2];
       const b = bambuByCode[code];
       if (b) {
         const [_, bName, bHex, bMatGroup] = b;
+        // 编号已确定品牌为拓竹，但用户可能还写了其他品牌关键字
+        const userBrand = detectBrand(s);
         return {
           inputName: s, name: bambuNameToCn(bName), bambuCode: code,
           color: bHex, material: matMap[bMatGroup] || 'PLA',
-          brand: '拓竹', fromBambu: true,
+          brand: userBrand || '拓竹', fromBambu: true,
         };
       }
-      const fb = s.replace(/\d{5}$/, '').trim();
-      return { inputName: s, name: fb || s, bambuCode: null, color: null, material: null, brand: null, fromBambu: false };
     }
-    return { inputName: s, name: s, bambuCode: null, color: null, material: null, brand: null, fromBambu: false };
+
+    // 2) 通用解析：品牌 + 颜色 + 材质 + 名称
+    const brand = detectBrand(s);
+    const colorHit = detectColor(s);
+    const material = detectMaterial(s);
+    let name = s
+      .replace(/\d{5}\s*$/, '')          // 去掉拓竹编号
+      .trim();
+    // 去掉品牌名和材质名，剩余部分作为颜色名
+    if (brand) {
+      brandDB.forEach(b => {
+        if (b.canonical === brand) b.aliases.forEach(a => {
+          const re = new RegExp(a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+          name = name.replace(re, '');
+        });
+      });
+    }
+    if (material) {
+      materialKeywords.forEach(([kw]) => {
+        name = name.replace(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '');
+      });
+    }
+    name = name.replace(/[-_—–|/、,，+＋\s]+/g, '').trim();
+    // 去掉「未知」「其他」等无意义占位词
+    name = name.replace(/^(未知|其他|无|default|unknown)+/i, '').trim();
+    if (!name) name = colorHit ? colorHit.name : s;
+
+    return {
+      inputName: s, name,
+      bambuCode: null,
+      color: colorHit ? colorHit.hex : null,
+      material,
+      brand,
+      fromBambu: false,
+    };
   });
 
+  // 3) 未识别到颜色的条目 → 自动生成配色
   const nonBambu = batchParsed.filter(p => !p.fromBambu);
-  nonBambu.forEach((p, i) => {
-    p.color = generateColor('#e84040', i, nonBambu.length);
+  const noColor = nonBambu.filter(p => !p.color);
+  noColor.forEach((p, i) => {
+    p.color = generateColor('#e84040', i, Math.max(noColor.length, 1));
+  });
+  nonBambu.forEach(p => {
     p.material = p.material || 'PLA';
-    p.brand = p.brand || '';
   });
 
   batchSelected = new Set();
@@ -2014,9 +2582,12 @@ function openModal(id = null) {
   document.getElementById('toggleSpool').classList.toggle('on', spoolState);
   document.getElementById('modalDeleteBtn').style.display = id ? 'inline-flex' : 'none';
   document.getElementById('bambuMatch').style.display = 'none';
+  const nameTip = document.getElementById('fNameMatch');
+  if (nameTip) { nameTip.textContent = ''; nameTip.style.color = 'var(--text-3)'; }
   // Populate datalist
   const dl = document.getElementById('bambuDatalist');
   dl.innerHTML = bambuFilaments.map(f => `<option value="${f[0]}">${bambuNameToCn(f[1])} — ${f[3]}</option>`).join('');
+  fillBrandDatalist();
   document.getElementById('modalBackdrop').classList.add('open');
 }
 
@@ -2060,6 +2631,39 @@ function saveFilament() {
 /* ══════════════════════════════
    Color helpers
 ══════════════════════════════ */
+
+// 单条添加：输入颜色名自动取色
+function autoColorFromName() {
+  const el = document.getElementById('fName');
+  const tip = document.getElementById('fNameMatch');
+  if (!el || !tip) return;
+  const hit = detectColor(el.value);
+  if (hit) {
+    setColor(hit.hex);
+    tip.textContent = '✓ 已识别「' + hit.name + '」 ' + hit.hex.toUpperCase();
+    tip.style.color = 'var(--success)';
+  } else {
+    tip.textContent = el.value.trim() ? '未收录该色名，可手动取色' : '';
+    tip.style.color = 'var(--text-3)';
+  }
+}
+
+// 单条添加：输入品牌名自动规范化
+function autoBrandFromName() {
+  const el = document.getElementById('fBrand');
+  if (!el) return;
+  const hit = detectBrand(el.value);
+  if (hit && hit !== el.value.trim()) {
+    el.value = hit;
+  }
+}
+
+// 填充品牌 datalist
+function fillBrandDatalist() {
+  const dl = document.getElementById('brandDatalist');
+  if (!dl) return;
+  dl.innerHTML = brandDB.map(b => `<option value="${b.canonical}">${b.aliases.slice(1, 4).join(' / ') || '—'}</option>`).join('');
+}
 function setColor(hex) {
   document.getElementById('fColorHex').value = hex;
   document.getElementById('fColorPicker').value = hex;
