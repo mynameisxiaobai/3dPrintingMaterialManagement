@@ -122,6 +122,9 @@
   }
   .filter-btn:hover { border-color: var(--border-hi); color: var(--text-1); }
   .filter-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .filter-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+  .filter-btn.danger:disabled { opacity: 0.4; cursor: not-allowed; }
+  .filter-btn.danger:disabled:hover { border-color: var(--border); color: var(--text-3); }
 
   .spacer { flex: 1; }
 
@@ -370,12 +373,25 @@
 
   .list-header {
     display: grid; align-items: center;
-    grid-template-columns: 40px 24px 1fr 120px 80px 80px 90px 100px;
+    grid-template-columns: 40px 24px 1fr 120px 80px 80px 90px 190px;
     gap: 12px; padding: 8px 16px; margin-bottom: 2px;
   }
   .list-header span { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); font-weight: 500; }
   .list-header .ta-r { text-align: right; }
   .list-header .ta-c { text-align: center; }
+
+  /* 列表行：与表头同构的 grid（末列放得下 - / + / 用完 / 编辑 / 删除） */
+  .list-row {
+    display: grid; align-items: center;
+    grid-template-columns: 40px 24px 1fr 120px 80px 80px 90px 190px;
+    gap: 12px; padding: 8px 16px;
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: var(--r); cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .list-row:hover { border-color: var(--border-hi); }
+  .list-row.selected { border-color: var(--accent); background: oklch(18% 0.02 185 / 0.5); }
+  .list-row.out-of-stock { opacity: 0.55; }
 
   .actions-cell { display: flex; gap: 4px; justify-content: flex-end; }
   .act-btn {
@@ -386,6 +402,10 @@
   .act-btn:hover { border-color: var(--border-hi); color: var(--text-1); }
   .act-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
   .act-btn.success:hover { border-color: var(--success); color: var(--success); }
+  .act-btn.finish:hover { border-color: var(--warn); color: var(--warn); }
+  .list-qty-note { display: block; font-size: 0.62rem; font-weight: 500; margin-top: 1px; }
+  .list-qty-note.warn { color: var(--warn); }
+  .list-qty-note.done { color: var(--danger); }
 
   /* ── Modal ── */
   .modal-backdrop {
@@ -620,7 +640,20 @@
     color: var(--text-1); transition: all 0.15s; line-height: 1;
   }
   .card-action-btn.del { color: var(--danger); }
+  .card-action-btn.finish { color: var(--warn); }
   .card-action-btn:hover { background: oklch(25% 0.02 240 / 0.9); }
+  /* 非编辑模式 hover 也显示操作条，但隐藏编辑/删除，只留「用完」 */
+  .filament-card:hover .card-edit-overlay { display: flex; pointer-events: auto; }
+  .filament-grid:not(.edit-mode) .card-action-btn.edit-only { display: none; }
+
+  /* 「已用完」提示 */
+  .finished-note {
+    font-size: 0.65rem; font-weight: 600; letter-spacing: 0.02em;
+    color: var(--warn); background: var(--bg-3);
+    border: 1px solid var(--border); border-radius: 3px;
+    padding: 1px 5px; white-space: nowrap;
+  }
+  .finished-note.done { color: var(--danger); border-color: var(--danger); }
 
   /* ── Empty state ── */
   .empty-state {
@@ -641,6 +674,302 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
 
+  /* ══════════════════════════════
+     色卡库（Swatch Library）
+  ══════════════════════════════ */
+  [hidden] { display: none !important; }
+
+  /* 页面 tabs */
+  .page-tabs {
+    display: flex; gap: 2px; margin-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .page-tab {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: none; border: none; border-bottom: 2px solid transparent;
+    padding: 9px 15px; margin-bottom: -1px; cursor: pointer;
+    font-family: inherit; font-size: 0.9rem; font-weight: 600;
+    color: var(--text-3); transition: color 0.18s, border-color 0.18s;
+  }
+  .page-tab:hover { color: var(--text-2); }
+  .page-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* Hero */
+  .sw-hero {
+    position: relative; overflow: hidden;
+    background: linear-gradient(135deg, var(--bg-2), var(--bg-3));
+    border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: 24px 26px; margin-bottom: 16px;
+  }
+  .sw-hero::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(520px 220px at 8% -30%, oklch(72% 0.18 185 / 0.14), transparent 65%),
+      radial-gradient(430px 200px at 88% -40%, oklch(70% 0.18 300 / 0.12), transparent 62%);
+  }
+  .sw-hero-title { position: relative; font-size: 1.45rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 6px; }
+  .sw-hero-sub { position: relative; color: var(--text-2); font-size: 0.87rem; max-width: 76ch; line-height: 1.6; }
+  .sw-stats { position: relative; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
+  .sw-stat {
+    display: inline-flex; align-items: baseline; gap: 6px;
+    padding: 5px 12px; border-radius: 999px;
+    background: var(--bg-3); border: 1px solid var(--border);
+    font-size: 0.74rem; color: var(--text-3);
+  }
+  .sw-stat b { font-family: 'Space Mono', monospace; font-size: 0.95rem; color: var(--text-1); font-weight: 700; }
+
+  /* Toolbar */
+  .sw-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 2px 0 10px; }
+  .sw-search {
+    position: relative; display: flex; align-items: center; gap: 8px;
+    flex: 1 1 250px; min-width: 190px;
+    background: var(--bg-3); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 0 10px; transition: border-color 0.18s;
+  }
+  .sw-search:focus-within { border-color: var(--accent); }
+  .sw-search svg { color: var(--text-3); flex: none; }
+  .sw-search input {
+    flex: 1; min-width: 0; background: none; border: none; outline: none;
+    color: var(--text-1); font-family: inherit; font-size: 0.88rem; padding: 9px 0;
+  }
+  .sw-search input::placeholder { color: var(--text-3); }
+  .sw-search.has-q .sw-search-clear { display: inline-flex; }
+  .sw-search-clear {
+    display: none; background: none; border: none; color: var(--text-3);
+    cursor: pointer; padding: 4px; align-items: center; border-radius: var(--r-sm);
+  }
+  .sw-search-clear:hover { color: var(--text-1); }
+
+  .sw-dd { position: relative; }
+  .sw-dd-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--bg-3); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 8px 11px; cursor: pointer;
+    font-family: inherit; font-size: 0.82rem; color: var(--text-1);
+    transition: border-color 0.18s; white-space: nowrap;
+  }
+  .sw-dd-btn:hover { border-color: var(--border-hi); }
+  .sw-dd-btn[aria-expanded="true"] { border-color: var(--accent); }
+  .sw-dd-label { color: var(--text-3); font-size: 0.74rem; }
+  .sw-dd-val { font-weight: 600; }
+  .sw-caret { transition: transform 0.18s; }
+  .sw-dd-btn[aria-expanded="true"] .sw-caret { transform: rotate(180deg); }
+  .sw-dd-panel {
+    position: absolute; top: calc(100% + 6px); left: 0; z-index: 80;
+    min-width: 210px; max-height: 340px; overflow-y: auto;
+    background: var(--bg-2); border: 1px solid var(--border-hi);
+    border-radius: var(--r); padding: 6px;
+    box-shadow: 0 14px 40px oklch(0% 0 0 / 0.55);
+    animation: swDrop 0.16s ease-out;
+  }
+  @keyframes swDrop { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  .sw-dd-group {
+    font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-3); padding: 8px 10px 4px;
+  }
+  .sw-dd-item {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    background: none; border: none; text-align: left; cursor: pointer;
+    padding: 7px 10px; border-radius: var(--r-sm);
+    font-family: inherit; font-size: 0.84rem; color: var(--text-2);
+  }
+  .sw-dd-item:hover { background: var(--bg-3); color: var(--text-1); }
+  .sw-dd-item[aria-selected="true"] { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+  .sw-dd-count { margin-left: auto; font-family: 'Space Mono', monospace; font-size: 0.72rem; color: var(--text-3); }
+  .sw-dot { width: 14px; height: 14px; border-radius: 4px; border: 1px solid oklch(100% 0 0 / 0.18); flex: none; }
+
+  .sw-seg { display: inline-flex; background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+  .sw-seg button {
+    background: none; border: none; cursor: pointer; padding: 8px 10px;
+    color: var(--text-3); display: inline-flex; align-items: center; transition: all 0.15s;
+  }
+  .sw-seg button:hover { color: var(--text-1); }
+  .sw-seg button.active { background: var(--accent-dim); color: var(--accent); }
+  .sw-ibtn {
+    background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--r);
+    padding: 8px 10px; cursor: pointer; color: var(--text-3);
+    display: inline-flex; align-items: center; transition: all 0.15s;
+  }
+  .sw-ibtn:hover { border-color: var(--border-hi); color: var(--text-1); }
+  .sw-ibtn[aria-pressed="true"] { color: var(--danger); border-color: var(--danger); }
+
+  /* 激活筛选条 */
+  .sw-activebar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 0 0 12px; }
+  .sw-chipx {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--accent-dim); border: 1px solid var(--accent);
+    color: var(--accent); border-radius: 999px; padding: 3px 5px 3px 11px;
+    font-size: 0.75rem; font-weight: 600;
+  }
+  .sw-chipx button {
+    background: none; border: none; color: inherit; cursor: pointer;
+    display: inline-flex; align-items: center; padding: 2px;
+    border-radius: 50%; opacity: 0.75;
+  }
+  .sw-chipx button:hover { opacity: 1; }
+  .sw-clear-all {
+    background: none; border: 1px solid var(--border); border-radius: 999px;
+    padding: 4px 12px; cursor: pointer; font-family: inherit; font-size: 0.75rem; color: var(--text-3);
+  }
+  .sw-clear-all:hover { border-color: var(--border-hi); color: var(--text-1); }
+
+  .sw-meta { color: var(--text-3); font-size: 0.79rem; padding: 0 0 12px; }
+  .sw-meta b { color: var(--text-1); font-family: 'Space Mono', monospace; }
+
+  /* 卡片网格 */
+  .sw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(188px, 1fr)); gap: 14px; }
+  .sw-card {
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 15px; overflow: hidden; cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s;
+    animation: swIn 0.32s ease-out both; animation-delay: var(--d, 0ms);
+  }
+  @keyframes swIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .sw-card:hover { transform: translateY(-3px); box-shadow: 0 12px 30px oklch(0% 0 0 / 0.45); border-color: var(--border-hi); }
+  .sw-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sw-card-swatch { position: relative; aspect-ratio: 1 / 0.74; }
+  .sw-card-swatch::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(160deg, oklch(100% 0 0 / 0.16), transparent 46%, oklch(0% 0 0 / 0.18));
+  }
+  .sw-card-hex {
+    position: absolute; top: 8px; right: 8px; z-index: 2;
+    background: oklch(0% 0 0 / 0.42); border: 1px solid oklch(100% 0 0 / 0.2);
+    color: #fff; border-radius: 999px; padding: 2px 8px;
+    font-family: 'Space Mono', monospace; font-size: 0.67rem;
+  }
+  .sw-card-fav {
+    position: absolute; top: 8px; left: 8px; z-index: 2;
+    background: oklch(0% 0 0 / 0.42); border: 1px solid oklch(100% 0 0 / 0.2);
+    color: #fff; border-radius: 999px; width: 22px; height: 22px;
+    display: none; align-items: center; justify-content: center; font-size: 0.75rem;
+  }
+  .sw-card.is-fav .sw-card-fav { display: inline-flex; color: var(--danger); }
+  .sw-card-acts {
+    position: absolute; inset: auto 0 0 0; z-index: 3;
+    display: flex; gap: 6px; justify-content: flex-end;
+    padding: 20px 8px 8px; opacity: 0; pointer-events: none;
+    background: linear-gradient(to top, oklch(0% 0 0 / 0.62), transparent);
+    transition: opacity 0.16s;
+  }
+  .sw-card:hover .sw-card-acts,
+  .sw-card:focus-within .sw-card-acts { opacity: 1; pointer-events: auto; }
+  .sw-act {
+    background: oklch(0% 0 0 / 0.55); border: 1px solid oklch(100% 0 0 / 0.2);
+    border-radius: 5px; color: #fff; font-family: inherit; font-size: 0.7rem;
+    font-weight: 600; padding: 4px 8px; cursor: pointer; line-height: 1; transition: background 0.15s;
+  }
+  .sw-act:hover { background: oklch(28% 0.02 240 / 0.92); }
+  .sw-card-body { padding: 10px 12px 12px; }
+  .sw-card-zh { font-weight: 650; font-size: 0.92rem; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sw-card-en { font-size: 0.7rem; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 7px; }
+  .sw-card-meta { display: flex; flex-wrap: wrap; gap: 4px; }
+  .sw-chip2 {
+    font-size: 0.65rem; padding: 1px 6px; border-radius: 3px;
+    background: var(--bg-3); border: 1px solid var(--border); color: var(--text-3);
+  }
+  .sw-chip2.code { font-family: 'Space Mono', monospace; color: var(--accent); border-color: var(--accent-dim); }
+
+  /* 列表视图 */
+  .sw-list { display: flex; flex-direction: column; gap: 5px; }
+  .sw-row {
+    display: grid; grid-template-columns: 40px 1fr 120px 100px 130px;
+    align-items: center; gap: 12px;
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r);
+    padding: 8px 14px; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    animation: swIn 0.3s ease-out both; animation-delay: var(--d, 0ms);
+  }
+  .sw-row:hover { border-color: var(--border-hi); background: var(--bg-3); }
+  .sw-row-sw { width: 32px; height: 32px; border-radius: 8px; border: 2px solid oklch(100% 0 0 / 0.14); }
+  .sw-row-name { font-weight: 600; font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sw-row-sub { font-size: 0.7rem; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sw-row-hex { font-family: 'Space Mono', monospace; font-size: 0.8rem; color: var(--text-2); }
+  .sw-row-acts { display: flex; gap: 5px; justify-content: flex-end; }
+
+  /* 空状态 / 按钮 */
+  .sw-empty { text-align: center; padding: 70px 20px; color: var(--text-3); }
+  .sw-empty-ico { font-size: 2.6rem; opacity: 0.55; margin-bottom: 10px; }
+  .sw-empty-title { font-size: 1rem; font-weight: 600; color: var(--text-2); margin-bottom: 4px; }
+  .sw-empty-sub { font-size: 0.85rem; margin-bottom: 14px; }
+  .sw-btn {
+    background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--r);
+    padding: 7px 13px; cursor: pointer; font-family: inherit; font-size: 0.8rem;
+    color: var(--text-2); transition: all 0.15s;
+  }
+  .sw-btn:hover { border-color: var(--border-hi); color: var(--text-1); }
+  .sw-btn.primary { background: var(--accent); border-color: var(--accent); color: oklch(15% 0.01 240); font-weight: 600; }
+  .sw-btn.primary:hover { filter: brightness(1.08); }
+  .sw-block { width: 100%; height: 38px; }
+
+  /* 品牌名录 */
+  .sw-brands { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); }
+  .sw-brands-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .sw-brands-head h3 { font-size: 1rem; font-weight: 650; }
+  .sw-brands-hint { font-size: 0.75rem; color: var(--text-3); }
+  .sw-brand-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 8px; }
+  .sw-brand {
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r);
+    padding: 9px 12px; cursor: pointer; text-align: left; font-family: inherit;
+    transition: all 0.15s;
+  }
+  .sw-brand:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .sw-brand-name { font-weight: 650; font-size: 0.86rem; color: var(--text-1); }
+  .sw-brand-alias { font-size: 0.68rem; color: var(--text-3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* 详情弹窗 */
+  .sw-modal { position: fixed; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .sw-modal-bd { position: absolute; inset: 0; background: oklch(0% 0 0 / 0.7); backdrop-filter: blur(4px); }
+  .sw-modal-panel {
+    position: relative; width: min(420px, 100%); max-height: 88vh; overflow-y: auto;
+    background: var(--bg-2); border: 1px solid var(--border-hi); border-radius: var(--r-lg);
+    box-shadow: 0 30px 80px oklch(0% 0 0 / 0.7); animation: swPop 0.2s ease-out;
+  }
+  @keyframes swPop { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+  .sw-modal-hero { position: relative; height: 148px; display: flex; align-items: flex-end; padding: 16px; }
+  .sw-modal-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, oklch(0% 0 0 / 0.58), transparent 62%); }
+  .sw-modal-close {
+    position: absolute; top: 10px; right: 10px; z-index: 3;
+    background: oklch(0% 0 0 / 0.42); border: 1px solid oklch(100% 0 0 / 0.2);
+    border-radius: 50%; width: 30px; height: 30px; display: inline-flex;
+    align-items: center; justify-content: center; color: #fff; cursor: pointer;
+  }
+  .sw-modal-close:hover { background: oklch(0% 0 0 / 0.7); }
+  .sw-modal-hero-txt { position: relative; z-index: 2; }
+  .sw-modal-title { font-size: 1.28rem; font-weight: 700; color: #fff; }
+  .sw-modal-sub { font-size: 0.79rem; color: oklch(100% 0 0 / 0.76); margin-top: 2px; }
+  .sw-modal-body { padding: 16px; display: grid; gap: 10px; }
+  .sw-tagline { display: flex; flex-wrap: wrap; gap: 5px; }
+  .sw-divider { height: 1px; background: var(--border); margin: 2px 0; }
+  .sw-kv { display: flex; align-items: center; gap: 10px; font-size: 0.82rem; }
+  .sw-k { width: 40px; color: var(--text-3); font-size: 0.71rem; letter-spacing: 0.06em; }
+  .sw-v { flex: 1; font-family: 'Space Mono', monospace; color: var(--text-1); font-size: 0.8rem; }
+  .sw-copy {
+    background: none; border: 1px solid var(--border); border-radius: var(--r-sm);
+    padding: 3px 8px; cursor: pointer; font-family: inherit; font-size: 0.7rem; color: var(--text-3);
+  }
+  .sw-copy:hover { border-color: var(--border-hi); color: var(--text-1); }
+  .sw-modal-nav { display: flex; gap: 6px; }
+  .sw-modal-nav .sw-btn { flex: 1; }
+  .sw-hint { font-size: 0.72rem; color: var(--text-3); text-align: center; line-height: 1.5; }
+
+  .sw-toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+    z-index: 400; background: var(--bg-3); border: 1px solid var(--border-hi);
+    color: var(--text-1); border-radius: 999px; padding: 9px 18px;
+    font-size: 0.82rem; box-shadow: 0 10px 30px oklch(0% 0 0 / 0.55);
+    animation: swToastIn 0.2s ease-out;
+  }
+  @keyframes swToastIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+  @media (max-width: 640px) {
+    .sw-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+    .sw-row { grid-template-columns: 34px 1fr 92px; }
+    .sw-row-sub, .sw-row-acts { display: none; }
+    .sw-dd-panel { max-width: calc(100vw - 32px); }
+  }
+
   /* ── Responsive ── */
   @media (max-width: 900px) {
     .list-row, .list-header { grid-template-columns: 40px 24px 1fr 90px 70px 70px 70px; }
@@ -651,6 +980,171 @@
     .stats-bar { grid-template-columns: 1fr 1fr; }
     .list-row, .list-header { grid-template-columns: 32px 20px 1fr 80px 60px; }
     .list-material-badge, .list-weight, .list-spool, .actions-cell { display: none; }
+  }
+
+  /* ══════════════ 数据统计页 ══════════════ */
+  .st-hero {
+    position: relative; overflow: hidden;
+    background: linear-gradient(135deg, oklch(17% 0.022 240), oklch(13% 0.014 240));
+    border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: 20px 22px; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  }
+  .st-hero::before {
+    content: ''; position: absolute; right: -70px; top: -90px; width: 280px; height: 280px;
+    background: radial-gradient(circle, oklch(72% 0.18 185 / 0.15), transparent 68%);
+    pointer-events: none;
+  }
+  .st-hero-txt { position: relative; flex: 1; min-width: 240px; }
+  .st-hero-title { font-size: 1.12rem; font-weight: 700; margin-bottom: 5px; }
+  .st-hero-sub { font-size: 0.82rem; color: var(--text-2); line-height: 1.65; max-width: 660px; }
+  .st-hero-acts { position: relative; display: flex; gap: 8px; }
+
+  .st-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--r);
+    color: var(--text-2); font-family: inherit; font-size: 0.8rem; font-weight: 500;
+    padding: 7px 13px; cursor: pointer; transition: all 0.15s;
+  }
+  .st-btn:hover { border-color: var(--border-hi); color: var(--text-1); }
+  .st-btn.primary { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+  .st-ctrl {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: 12px 16px; margin-bottom: 16px;
+  }
+  .st-ctrl-item { display: flex; align-items: center; gap: 8px; }
+  .st-ctrl-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-3); white-space: nowrap; }
+  .st-ctrl-spacer { flex: 1; }
+  .st-meta { font-size: 0.78rem; color: var(--text-3); }
+  .st-meta b { color: var(--text-1); font-family: 'Space Mono', monospace; font-weight: 700; }
+
+  .st-seg { display: inline-flex; background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+  .st-seg button {
+    background: none; border: none; color: var(--text-3); cursor: pointer;
+    font-family: inherit; font-size: 0.78rem; font-weight: 500; padding: 6px 12px; transition: all 0.15s;
+  }
+  .st-seg button + button { border-left: 1px solid var(--border); }
+  .st-seg button:hover { color: var(--text-1); }
+  .st-seg button.active { background: var(--accent-dim); color: var(--accent); }
+  .st-seg.mini button { padding: 4px 9px; font-size: 0.72rem; }
+
+  .st-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(142px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .st-kpi {
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: 14px 16px; transition: border-color 0.2s, transform 0.2s;
+  }
+  .st-kpi:hover { border-color: var(--border-hi); transform: translateY(-2px); }
+  .st-kpi-label { font-size: 0.69rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-3); margin-bottom: 6px; }
+  .st-kpi-value { font-family: 'Space Mono', monospace; font-size: 1.4rem; font-weight: 700; color: var(--text-1); line-height: 1.15; }
+  .st-kpi-value small { font-size: 0.72rem; color: var(--text-3); font-weight: 400; margin-left: 3px; }
+  .st-kpi-sub { font-size: 0.72rem; color: var(--text-3); margin-top: 5px; }
+  .st-kpi.a .st-kpi-value { color: var(--accent); }
+  .st-kpi.s .st-kpi-value { color: var(--success); }
+  .st-kpi.w .st-kpi-value { color: var(--warn); }
+  .st-kpi.d .st-kpi-value { color: var(--danger); }
+  .st-kpi.p .st-kpi-value { color: oklch(74% 0.17 320); }
+
+  .st-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; align-items: start; }
+  .st-card {
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: 16px 18px 18px; display: flex; flex-direction: column;
+  }
+  .st-card.wide { grid-column: 1 / -1; }
+  .st-card-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
+  .st-card-ico {
+    width: 30px; height: 30px; border-radius: 9px; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg-3); border: 1px solid var(--border); color: var(--accent);
+  }
+  .st-card-t { flex: 1; min-width: 0; }
+  .st-card-title { font-size: 0.95rem; font-weight: 650; }
+  .st-card-sub { font-size: 0.72rem; color: var(--text-3); margin-top: 2px; }
+  .st-card-tools { display: flex; gap: 6px; align-items: center; }
+
+  /* Donut */
+  .st-split { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+  .st-donut-wrap { position: relative; width: 176px; height: 176px; flex: none; }
+  .st-donut { width: 176px; height: 176px; display: block; }
+  .st-arc { transition: stroke-width 0.16s ease, opacity 0.16s ease; cursor: pointer; }
+  .st-arc.dim { opacity: 0.3; }
+  .st-arc.hot { stroke-width: 33; }
+  .st-donut-mid {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; pointer-events: none; padding: 0 40px;
+  }
+  .st-donut-mid .v { font-family: 'Space Mono', monospace; font-size: 1.22rem; font-weight: 700; line-height: 1.15; color: var(--text-1); }
+  .st-donut-mid .v small { font-size: 0.68rem; color: var(--text-3); font-weight: 400; margin-left: 2px; }
+  .st-donut-mid .k { font-size: 0.74rem; color: var(--text-2); margin-top: 3px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .st-donut-mid .p { font-size: 0.7rem; color: var(--accent); margin-top: 2px; font-family: 'Space Mono', monospace; }
+
+  .st-legend { flex: 1; min-width: 210px; display: flex; flex-direction: column; gap: 1px; max-height: 196px; overflow-y: auto; padding-right: 4px; }
+  .st-legend::-webkit-scrollbar { width: 6px; }
+  .st-legend::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+  .st-lg {
+    display: grid; grid-template-columns: 12px 1fr auto auto; align-items: center; gap: 8px;
+    padding: 5px 6px; border-radius: var(--r-sm); cursor: pointer; transition: background 0.14s;
+  }
+  .st-lg:hover, .st-lg.hot { background: var(--bg-3); }
+  .st-lg-dot { width: 11px; height: 11px; border-radius: 3px; border: 1px solid oklch(100% 0 0 / 0.22); }
+  .st-lg-name { font-size: 0.82rem; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .st-lg-name small { color: var(--text-3); font-size: 0.7rem; margin-left: 5px; }
+  .st-lg-val { font-family: 'Space Mono', monospace; font-size: 0.78rem; color: var(--text-2); }
+  .st-lg-pct { font-family: 'Space Mono', monospace; font-size: 0.74rem; color: var(--text-3); min-width: 46px; text-align: right; }
+
+  /* Bars */
+  .st-bars { display: flex; flex-direction: column; gap: 6px; }
+  .st-bar {
+    display: grid; grid-template-columns: 92px 1fr 118px; align-items: center; gap: 10px;
+    cursor: pointer; padding: 3px 5px; border-radius: var(--r-sm); transition: background 0.14s;
+  }
+  .st-bar:hover { background: var(--bg-3); }
+  .st-bar-name { font-size: 0.82rem; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .st-bar-track { height: 17px; background: var(--bg-3); border-radius: 5px; overflow: hidden; border: 1px solid var(--border); }
+  .st-bar-fill { height: 100%; border-radius: 4px; transition: width 0.55s cubic-bezier(0.22,1,0.36,1); min-width: 4px; }
+  .st-bar-val { font-family: 'Space Mono', monospace; font-size: 0.75rem; color: var(--text-2); text-align: right; white-space: nowrap; }
+  .st-bar-val i { color: var(--text-3); font-style: normal; }
+
+  /* Table */
+  .st-tbl-wrap { overflow-x: auto; }
+  .st-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .st-table th {
+    text-align: left; font-size: 0.69rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-3); font-weight: 600; padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  .st-table td { padding: 6px 8px; border-bottom: 1px solid oklch(24% 0.012 240); color: var(--text-2); vertical-align: middle; }
+  .st-table tbody tr { cursor: pointer; transition: background 0.14s; }
+  .st-table tbody tr:hover { background: var(--bg-3); }
+  .st-table td.num, .st-table th.num { text-align: right; font-family: 'Space Mono', monospace; }
+  .st-table .nm { color: var(--text-1); font-weight: 550; }
+  .st-mini-track { width: 80px; height: 8px; background: var(--bg-3); border-radius: 99px; overflow: hidden; display: inline-block; vertical-align: middle; border: 1px solid var(--border); }
+  .st-mini-fill { height: 100%; border-radius: 99px; }
+  .st-sw { width: 18px; height: 18px; border-radius: 5px; border: 1px solid oklch(100% 0 0 / 0.2); display: inline-block; vertical-align: middle; margin-right: 7px; }
+
+  /* Matrix */
+  .st-mx-wrap { overflow-x: auto; }
+  .st-mx { border-collapse: collapse; font-size: 0.8rem; min-width: 100%; }
+  .st-mx th, .st-mx td { border: 1px solid var(--border); padding: 7px 11px; text-align: center; white-space: nowrap; }
+  .st-mx thead th { background: var(--bg-3); color: var(--text-2); font-weight: 600; font-size: 0.75rem; }
+  .st-mx tbody th { background: var(--bg-3); color: var(--text-1); font-weight: 600; text-align: left; position: sticky; left: 0; }
+  .st-mx .cell { font-family: 'Space Mono', monospace; color: var(--text-1); cursor: pointer; transition: box-shadow 0.12s; }
+  .st-mx .cell:hover { box-shadow: inset 0 0 0 2px var(--accent); }
+  .st-mx .cell.zero { color: var(--text-3); opacity: 0.45; }
+  .st-mx tfoot th, .st-mx tfoot td { background: oklch(20% 0.014 240); font-weight: 700; color: var(--text-1); font-family: 'Space Mono', monospace; }
+
+  .st-note { font-size: 0.72rem; color: var(--text-3); margin-top: 12px; line-height: 1.6; }
+  .st-note b { color: var(--text-2); font-weight: 600; }
+  .st-empty { text-align: center; padding: 74px 20px; color: var(--text-3); }
+  .st-empty-ico { font-size: 2.6rem; opacity: 0.5; margin-bottom: 10px; }
+  .st-empty-title { font-size: 1rem; font-weight: 600; color: var(--text-2); margin-bottom: 4px; }
+  .st-empty-sub { font-size: 0.85rem; margin-bottom: 14px; }
+
+  @media (max-width: 900px) { .st-cards { grid-template-columns: 1fr; } }
+  @media (max-width: 720px) {
+    .st-bar { grid-template-columns: 74px 1fr 100px; }
+    .st-donut-wrap, .st-donut { width: 152px; height: 152px; }
+    .st-donut-mid { padding: 0 30px; }
   }
 </style>
 </head>
@@ -686,6 +1180,25 @@
 <!-- ── Main ── -->
 <main>
 
+  <!-- Page tabs -->
+  <div class="page-tabs" role="tablist" aria-label="页面切换">
+    <button class="page-tab active" id="tabInventory" role="tab" aria-selected="true" onclick="switchPage('inventory')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7h18v13H3z"/><path d="M3 7l2.2-4h13.6L21 7"/><path d="M9 11h6"/></svg>
+      耗材库存
+    </button>
+    <button class="page-tab" id="tabSwatch" role="tab" aria-selected="false" onclick="switchPage('swatch')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18z" fill="currentColor" opacity="0.3"/><circle cx="9" cy="9.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="14.5" cy="9.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="10" cy="15" r="1.5" fill="currentColor" stroke="none"/></svg>
+      色卡库
+    </button>
+    <button class="page-tab" id="tabStats" role="tab" aria-selected="false" onclick="switchPage('stats')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="21" x2="21" y2="21"/><rect x="5" y="12" width="4" height="7" rx="1"/><rect x="11" y="7" width="4" height="12" rx="1"/><rect x="17" y="3" width="4" height="16" rx="1"/></svg>
+      数据统计
+    </button>
+  </div>
+
+  <!-- ══════════ 页面：耗材库存 ══════════ -->
+  <div class="page active" id="pageInventory">
+
   <!-- Stats -->
   <div class="stats-bar" id="statsBar"></div>
 
@@ -718,6 +1231,8 @@
       <button class="filter-btn" id="filterAll" onclick="setStatusFilter('all')">全部</button>
       <button class="filter-btn" id="filterInStock" onclick="setStatusFilter('instock')">有库存</button>
       <button class="filter-btn" id="filterNoSpool" onclick="setStatusFilter('nospool')">无料盘</button>
+      <button class="filter-btn" id="filterFinished" onclick="setStatusFilter('finished')">已用完</button>
+      <button class="filter-btn danger" id="clearFinishedBtn" onclick="clearFinished()" title="删除所有已用完的耗材记录">清理用完</button>
     </div>
 
     <div class="view-toggle">
@@ -754,6 +1269,138 @@
     <div class="empty-icon">🧵</div>
     <div class="empty-title">暂无耗材</div>
     <div class="empty-sub">点击右上角「添加耗材」，开始管理你的3D打印库存</div>
+  </div>
+
+  </div><!-- /pageInventory -->
+
+  <!-- ══════════ 页面：色卡库 ══════════ -->
+  <div class="page" id="pageSwatch" hidden>
+
+    <div class="sw-hero">
+      <div class="sw-hero-title">色卡库 · 全部品牌与颜色</div>
+      <div class="sw-hero-sub">汇集拓竹官方编号色卡、通用中文色名库与品牌名录；支持搜索、色系筛选、一键复制 HEX，并可直接带入添加面板入库。</div>
+      <div class="sw-stats" id="swStats"></div>
+    </div>
+
+    <div class="sw-toolbar">
+      <div class="sw-search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="swQ" type="search" autocomplete="off" placeholder="搜索：玉白 / Jade White / 10100 / #FFFFFF" oninput="onSwSearch()">
+        <button class="sw-search-clear" id="swClearQ" onclick="clearSwQ()" aria-label="清空搜索" title="清空">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="sw-dd" id="swDdSrc">
+        <button class="sw-dd-btn" id="swSrcBtn" onclick="toggleSwDd('src')" aria-expanded="false" aria-haspopup="listbox">
+          <span class="sw-dd-label">来源</span><span class="sw-dd-val" id="swSrcVal">全部</span>
+          <svg class="sw-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="sw-dd-panel" id="swSrcPanel" role="listbox" aria-label="按来源筛选" hidden></div>
+      </div>
+
+      <div class="sw-dd" id="swDdFam">
+        <button class="sw-dd-btn" id="swFamBtn" onclick="toggleSwDd('fam')" aria-expanded="false" aria-haspopup="listbox">
+          <span class="sw-dd-label">色系</span><span class="sw-dd-val" id="swFamVal">全部</span>
+          <svg class="sw-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="sw-dd-panel" id="swFamPanel" role="listbox" aria-label="按色系筛选" hidden></div>
+      </div>
+
+      <div class="sw-dd" id="swDdSort">
+        <button class="sw-dd-btn" id="swSortBtn" onclick="toggleSwDd('sort')" aria-expanded="false" aria-haspopup="listbox">
+          <span class="sw-dd-label">排序</span><span class="sw-dd-val" id="swSortVal">默认</span>
+          <svg class="sw-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="sw-dd-panel" id="swSortPanel" role="listbox" aria-label="排序方式" hidden></div>
+      </div>
+
+      <div class="sw-seg" role="group" aria-label="视图切换">
+        <button id="swVGrid" class="active" onclick="setSwView('grid')" aria-pressed="true" aria-label="卡片视图" title="卡片视图">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        </button>
+        <button id="swVList" onclick="setSwView('list')" aria-pressed="false" aria-label="列表视图" title="列表视图">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+      </div>
+
+      <button class="sw-ibtn" id="swFavOnly" onclick="toggleSwFavOnly()" aria-pressed="false" title="仅看收藏" aria-label="仅看收藏">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1L12 21.2l7.7-7.8 1.1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+      </button>
+    </div>
+
+    <div class="sw-activebar" id="swActiveBar" hidden></div>
+
+    <div class="sw-meta"><span id="swCount"></span></div>
+
+    <div id="swResults"></div>
+
+    <div class="sw-empty" id="swEmpty" hidden>
+      <div class="sw-empty-ico">🎨</div>
+      <div class="sw-empty-title">没有匹配的颜色</div>
+      <div class="sw-empty-sub">换个关键词，或清除筛选条件试试</div>
+      <button class="sw-btn" onclick="resetSwFilters()">清除全部筛选</button>
+    </div>
+
+    <div class="sw-brands">
+      <div class="sw-brands-head">
+        <h3>品牌名录</h3>
+        <span class="sw-brands-hint">点击品牌 → 打开添加面板并自动填入该品牌</span>
+      </div>
+      <div class="sw-brand-grid" id="swBrandGrid"></div>
+    </div>
+  </div>
+
+  <!-- ══════════ 页面：数据统计 ══════════ -->
+  <div class="page" id="pageStats" hidden>
+
+    <div class="st-hero">
+      <div class="st-hero-txt">
+        <div class="st-hero-title">数据统计 · 库存结构分析</div>
+        <div class="st-hero-sub">从品牌、材质、色系、标签、规格等多个维度统计当前库存构成；每张图表都可在「环形 / 条形 / 表格」之间自由切换，点击任意条目即可跳转库存并自动筛选。</div>
+      </div>
+      <div class="st-hero-acts">
+        <button class="st-btn" onclick="exportStatsCsv()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          导出 CSV
+        </button>
+        <button class="st-btn" onclick="renderStatsPage();stToast('统计已刷新')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+          刷新
+        </button>
+      </div>
+    </div>
+
+    <div class="st-ctrl">
+      <div class="st-ctrl-item">
+        <span class="st-ctrl-label">口径</span>
+        <div class="st-seg" role="group" aria-label="统计口径">
+          <button id="stMRolls" class="active" onclick="setStMetric('rolls')">卷数</button>
+          <button id="stMWeight" onclick="setStMetric('weight')">重量</button>
+        </div>
+      </div>
+      <div class="st-ctrl-item">
+        <span class="st-ctrl-label">范围</span>
+        <div class="st-seg" role="group" aria-label="统计范围">
+          <button id="stSRemain" class="active" onclick="setStScope('remain')">剩余库存</button>
+          <button id="stSAll" onclick="setStScope('all')">含已用完</button>
+          <button id="stSFin" onclick="setStScope('finished')">仅已用完</button>
+        </div>
+      </div>
+      <span class="st-ctrl-spacer"></span>
+      <div class="st-meta" id="stMeta"></div>
+    </div>
+
+    <div class="st-kpis" id="stKpis"></div>
+    <div class="st-cards" id="stCards"></div>
+
+    <div class="st-empty" id="stEmpty" hidden>
+      <div class="st-empty-ico">📊</div>
+      <div class="st-empty-title">还没有可统计的数据</div>
+      <div class="st-empty-sub">先添加几卷耗材，这里会自动生成品牌、材质、色系等维度的统计图表</div>
+      <button class="st-btn primary" onclick="openModal()">添加耗材</button>
+    </div>
+
   </div>
 
 </main>
@@ -1112,17 +1759,51 @@
   </div>
 </div>
 
+<!-- ══════════ 色卡详情弹窗 ══════════ -->
+<div class="sw-modal" id="swModal" hidden>
+  <div class="sw-modal-bd" onclick="closeSwModal()"></div>
+  <div class="sw-modal-panel" role="dialog" aria-modal="true" aria-labelledby="swMTitle">
+    <div class="sw-modal-hero" id="swMHero">
+      <button class="sw-modal-close" onclick="closeSwModal()" aria-label="关闭">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <div class="sw-modal-hero-txt">
+        <div class="sw-modal-title" id="swMTitle">—</div>
+        <div class="sw-modal-sub" id="swMSub">—</div>
+      </div>
+    </div>
+    <div class="sw-modal-body">
+      <div class="sw-tagline" id="swMTags"></div>
+      <button class="sw-btn primary sw-block" onclick="swCopyCurrentHex()">复制 HEX 色值</button>
+      <div class="sw-divider"></div>
+      <div class="sw-kv"><span class="sw-k">HEX</span><span class="sw-v" id="swMHex">—</span><button class="sw-copy" onclick="swCopy('hex')">复制</button></div>
+      <div class="sw-kv"><span class="sw-k">RGB</span><span class="sw-v" id="swMRgb">—</span><button class="sw-copy" onclick="swCopy('rgb')">复制</button></div>
+      <div class="sw-kv"><span class="sw-k">HSL</span><span class="sw-v" id="swMHsl">—</span><button class="sw-copy" onclick="swCopy('hsl')">复制</button></div>
+      <div class="sw-divider"></div>
+      <div class="sw-modal-nav">
+        <button class="sw-btn" id="swMFav" onclick="swToggleFavCurrent()">♡ 收藏</button>
+        <button class="sw-btn" onclick="swStep(-1)">← 上一个</button>
+        <button class="sw-btn" onclick="swStep(1)">下一个 →</button>
+      </div>
+      <button class="sw-btn primary sw-block" onclick="swAddToStock()">＋ 加入库存</button>
+      <p class="sw-hint">加入库存会打开添加面板并预填名称 / 颜色 / 编号 / 材质，确认后即可保存。</p>
+    </div>
+  </div>
+</div>
+
+<div class="sw-toast" id="swToast" hidden><span id="swToastMsg"></span></div>
+
 <script>
 /* ══════════════════════════════
    State
 ══════════════════════════════ */
 let data = JSON.parse(localStorage.getItem('filaments') || 'null') || [
   { id:1, name:'玉白', bambuCode:'10100', brand:'拓竹', material:'PLA', color:'#FFFFFF', weight:1000, qty:3, hasSpool:true, tags:['基础色','常用'] },
-  { id:2, name:'哑光海蓝', bambuCode:'11600', brand:'拓竹', material:'PLA', color:'#0078BF', weight:1000, qty:2, hasSpool:true, tags:['哑光','哑光蓝'] },
+  { id:2, name:'哑光海蓝', bambuCode:'11600', brand:'拓竹', material:'PLA', color:'#0078BF', weight:1000, qty:2, finished:1, hasSpool:true, tags:['哑光','哑光蓝'] },
   { id:3, name:'极夜黑', bambuCode:null, brand:'创想三维', material:'PETG', color:'#1a1a2e', weight:800, qty:1, hasSpool:false, tags:['功能性'] },
   { id:4, name:'红色', bambuCode:'10200', brand:'拓竹', material:'PLA', color:'#C12E1F', weight:1000, qty:4, hasSpool:true, tags:['基础色','常用'] },
   { id:5, name:'哑光猩红', bambuCode:'11200', brand:'拓竹', material:'PLA', color:'#DE4343', weight:1000, qty:1, hasSpool:true, tags:['哑光','哑光红','鲜艳'] },
-  { id:6, name:'橙焰', bambuCode:null, brand:'eSUN', material:'ABS', color:'#f97316', weight:800, qty:0, hasSpool:false, tags:['功能性','耐高温'] },
+  { id:6, name:'橙焰', bambuCode:null, brand:'eSUN', material:'ABS', color:'#f97316', weight:800, qty:0, finished:2, hasSpool:false, tags:['功能性','耐高温'] },
   { id:7, name:'哑光丁香紫', bambuCode:'11700', brand:'拓竹', material:'PLA', color:'#AE96D4', weight:1000, qty:2, hasSpool:true, tags:['哑光','特殊色'] },
   { id:8, name:'TPU 95A 红', bambuCode:'51200', brand:'拓竹', material:'TPU', color:'#C8102E', weight:600, qty:1, hasSpool:true, tags:['柔性','特殊色'] },
 ];
@@ -1315,6 +1996,17 @@ const bambuNameCn = {
 
 const bambuNameToCn = (en) => bambuNameCn[en] || en;
 
+// 拓竹材质系列 → 本站材质下拉值
+// 供批量解析、编号查询、色卡库共用（原先在两处各定义一份，现统一）
+const matMap = {
+  'PLA Basic':'PLA','PLA Matte':'PLA','PLA Silk+':'SILK','PLA CF':'CF 碳纤维','PLA Lite':'PLA',
+  'PLA Marble':'PLA','PLA Wood':'PLA','PLA Glow':'PLA','PLA Sparkle':'PLA','PLA Metal':'PLA',
+  'PETG Basic':'PETG','PETG HF':'PETG','PETG CF':'PETG','PETG Translucent':'PETG',
+  'ABS':'ABS','ABS-GF':'ABS','ASA':'ASA',
+  'TPU for AMS':'TPU','TPU 95A HF':'TPU',
+  'PC':'PC','PA6-GF':'其他',
+};
+
 /* ══════════════════════════════
    品牌库 —— 识别输入中的品牌关键词
    canonical: 标准品牌名    aliases: 可识别的写法
@@ -1327,6 +2019,24 @@ const brandDB = [
   { canonical:'JAYO',aliases:['jayo','佳友','佳友三维'] },
   { canonical:'瑞鑫',aliases:['瑞鑫','ruixin','瑞鑫科技'] },
   { canonical:'维籁',aliases:['维籁','weilai','维籁科技'] },
+  { canonical:'彩多屋',aliases:['彩多屋','cailab','cai lab','多彩屋','caiduowu','彩多屋cailab'] },
+  { canonical:'纵维立方',aliases:['纵维立方','anycubic','any cubic','anycubic耗材'] },
+  { canonical:'智能派',aliases:['智能派','elegoo','elegool','爱烙极'] },
+  { canonical:'爱丽丝',aliases:['爱丽丝','eryone','ery one'] },
+  { canonical:'GEEETECH',aliases:['geeetech','geee tech','捷泰','捷泰科技'] },
+  { canonical:'Prusa',aliases:['prusa','prusament','prusa research'] },
+  { canonical:'Overture',aliases:['overture','overture filament'] },
+  { canonical:'Hatchbox',aliases:['hatchbox','hatch box'] },
+  { canonical:'iSANMATE',aliases:['isanmate','i sanmate','艾森迈'] },
+  { canonical:'南极熊',aliases:['南极熊','nanji xiong','南极熊耗材'] },
+  { canonical:'银禧',aliases:['银禧','银禧科技','yinxi'] },
+  { canonical:'光华伟业',aliases:['光华伟业','光华','guanghua','esun光华'] },
+  { canonical:'中航迈特',aliases:['中航迈特','zhonghangmaite','中航'] },
+  { canonical:'索沃',aliases:['索沃','sovol','sovol3d'] },
+  { canonical:'金浪',aliases:['金浪','kingroon','king roon'] },
+  { canonical:'Voxelab',aliases:['voxelab','voxel ab','沃克斯'] },
+  { canonical:'孚森',aliases:['孚森','flsun','f l sun'] },
+  { canonical:'双树',aliases:['双树','twotrees','two trees'] },
   { canonical:'创想三维',aliases:['创想','创想三维','creality','创想三d'] },
   { canonical:'eSUN',aliases:['esun','e sun','易加'] },
   { canonical:'Polymaker',aliases:['polymaker','宝力马'] },
@@ -1367,46 +2077,66 @@ const colorDB = {
   '骨白':'#EEE7D4','米白':'#F5F2E8','乳白':'#FFFBF0',
   '黑色':'#000000','纯黑':'#000000','哑光黑':'#1A1A1A','极夜黑':'#1A1A2E','暗夜黑':'#28334A',
   '灰色':'#808080','深灰':'#3A3A3C','浅灰':'#C0C0C0','哑光灰':'#9FA19F','银灰':'#63666A',
-  '黑色哑光':'#1A1A1A',
+  '黑色哑光':'#1A1A1A','碳灰':'#4A4A4C','碳灰色':'#4A4A4C','大理石白':'#F0F0EE','大理石':'#EDEDEA',
+  '高级灰':'#8E8E93','雾霾灰':'#9CA3AF','枪灰':'#5A5A5E','水泥灰':'#A8A8A0',
+  '浅灰色':'#C0C0C0','深灰色':'#3A3A3C','中灰':'#8E8E93','银灰色':'#63666A',
+  '瓷白色':'#F4F9FF','象牙白哑光':'#F5F3E8','哑光象牙白':'#F5F3E8','云朵':'#FAFAFA','云朵色':'#FAFAFA',
   // ── 红粉 ──
   '红色':'#C12E1F','正红':'#E60012','纯红':'#D6001C','大红':'#E53935','朱红':'#E34234',
   '酒红':'#6D1A36','枣红':'#8C1C13','玫红':'#E0447C','粉红':'#FFC0CB','樱花粉':'#FFD1DC',
   '樱花色':'#FFD1DC','桃粉':'#FFB7C5','珊瑚红':'#FF6F61','西瓜红':'#E63946',
   '热粉色':'#FF6D9E','洋红':'#C72C71','品红':'#D5419E','桃红':'#F472B6',
   '砖红':'#CB4154','砖红色':'#CB4154','赤红':'#C3272B','火红':'#E63329','胭脂':'#9D2933',
+  '正红色':'#E60012','大红色':'#E53935','纯红色':'#D6001C','深红色':'#8B0000','亮红色':'#FF2400',
   '豆沙红':'#C08081','藕荷色':'#C4A5B5','粉紫':'#E0B0FF','玫瑰粉':'#F7C6CE',
+  '雾霾粉':'#D8B4B8','哑光雾霾粉':'#D8B4B8','藕粉':'#E8C4C8','蜜桃色':'#FFCBA4',
+  '西柚色':'#FF6B6B','奶油桃':'#FFC9B5','布丁色':'#F5E1B8','爱马仕橙':'#E8722C',
+  '马卡龙粉':'#F7C6CE','马卡龙蓝':'#A8D8E8','马卡龙绿':'#B8E0C0','马卡龙紫':'#C8B8E0','马卡龙黄':'#F7E8B0',
+  '马卡龙':'#F7C6CE','马卡龙色':'#F7C6CE',
   // ── 橙黄 ──
   '橙色':'#FF7F27','南瓜橙':'#E8792B','阳光橙':'#FF8C54','橘色':'#FF8C00','橘黄':'#FAA61A',
   '橙色哑光':'#E8792B','赤橙':'#FF4B00','杏色':'#FFE4C4','浅橙':'#FFCBA4',
   '黄色':'#FCE300','明黄':'#EAC642','柠檬黄':'#F2F0A1','金黄':'#FFC300','鹅黄':'#FFF143',
-  '奶黄':'#F5E6A8','淡黄':'#FAF0C0',
+  '奶黄':'#F5E6A8','淡黄':'#FAF0C0','布丁黄':'#F5E1B8','奶油色':'#F5E6D0','奶油黄':'#F7E7CE',
   // ── 绿 ──
   '绿色':'#00BB31','深绿':'#1B4D3E','墨绿':'#1B4D3E','草绿':'#4CAF50','苹果绿':'#A8C63F',
   '开心果绿':'#9DCB6E','嫩绿':'#C3E6A0','薄荷绿':'#00C7B1','青柠绿':'#C5ED48','柠檬绿':'#C5ED48',
   '橄榄绿':'#5A6D3D','丛林绿':'#2E4D2B','军绿':'#4B5320','抹茶绿':'#B5C99A','豆绿':'#9ACD68',
   '荧光绿':'#4AFF4F','翠绿':'#00C9A7','祖母绿':'#50C878',
+  '竹子绿':'#7BA05B','牛油果绿':'#7B8F4E','鼠尾草绿':'#9CAF88','豆沙绿':'#8FA07A',
+  '春茶绿':'#A8C98F','哑光抹茶绿':'#B5C99A','莫兰迪绿':'#8F9E82','蒂芙尼绿':'#81D8D0',
   // ── 蓝青 ──
   '蓝色':'#0078BF','天蓝':'#87CEEB','湖蓝':'#0078BF','海蓝':'#0078BF','深蓝':'#003DA5',
   '钴蓝':'#0047AB','克莱因蓝':'#1729AB','宝蓝':'#2E5AAC','孔雀蓝':'#00A4E1',
   '冰蓝':'#AEEAFF','粉蓝':'#B0E0E6','灰蓝':'#5B7C99','蓝灰':'#5B7C99','藏青':'#1B2A4A',
   '青色':'#00FFFF','蓝青':'#007FFF','青蓝':'#00A0C6','薄荷青':'#40E0D0',
+  '薄荷蓝':'#7FD4D4','哑光雾霾蓝':'#8FA8B8','雾霾蓝':'#8FA8B8','莫兰迪蓝':'#7C93A6',
+  '蒂芙尼蓝':'#81D8D0','冰川蓝':'#A8D8E8','牛仔蓝':'#4A6D8C','哑光天青釉':'#9CB4B8',
+  '天青釉':'#9CB4B8','极光蓝':'#5B8FA8',
   // ── 紫 ──
   '紫色':'#8B5FBF','莫兰迪紫':'#9B8FB3','薰衣草紫':'#685BC7','丁香紫':'#AE96D4',
   '香芋紫':'#9B8FB3','浅紫':'#C9A9E0','深紫':'#5B2C8D','紫罗兰':'#8F5FBF',
-  '雪纺紫':'#D8C3E8','雾霾紫':'#8B7B8B',
+  '雪纺紫':'#D8C3E8','雾霾紫':'#8B7B8B','星云紫':'#6B5B95','极光紫':'#9B7BB8',
+  '星空紫':'#5B4B7B','星空蓝':'#1B3B6F','星空':'#2A3A5B','银河紫':'#6A5A8B',
   // ── 棕/肤/木 ──
   '棕色':'#8B5A2B','深棕':'#4F2C1D','咖啡色':'#6F4E37','巧克力':'#906557','浅棕':'#C19A6B',
   '花生棕':'#8C6239','奶茶色':'#D9C2A3','摩卡':'#8B6F61','焦糖':'#B87333','肉桂':'#A9714B',
   '肤色':'#F0D0B4','浅肤色':'#F7E0C8','蜜色':'#E8B888','象牙肤色':'#F3DCC3',
   '原木色':'#C2B29A','橡木色':'#C2B29A','胡桃木':'#5B4636','木色':'#C19A6B','浅木色':'#DDC4A0',
+  '拿铁':'#D4B49C','哑光拿铁':'#D4B49C','卡其色':'#C3B091','驼色':'#A16B47','燕麦色':'#E0D4C0',
   // ── 金银/特殊 ──
   '金色':'#D4AF37','亮金':'#FFD700','丝绸亮金':'#E6C36A','玫瑰金':'#B76E79','香槟金':'#F7E7CE',
   '银色':'#C0C0C0','古铜':'#8B6914','铜色':'#B87333','珍珠白':'#F0F0F0','幻彩紫':'#B44FD4',
+  '钛金':'#8C7A6B','枪色':'#4A4A50','铂金':'#E5E4E2','紫金':'#8B6F8F',
   // ── 特殊效果 ──
   '彩虹糖果色':'#F77F9F','彩虹':'#F77F9F','幻彩':'#8E7CFF','渐变':'#7FD8D0',
   '夜光':'#D9F7F5','荧光黄':'#E8FF33','发光':'#D9F7F5','透明':'#E8F4F8','半透':'#DCE9EE',
   '磨砂':'#E0E0DC','哑光':'#D8D8D4','亮光':'#F5F5F5','金属':'#B0B4BA',
   '夜光绿':'#3DFF8A','夜光蓝':'#4DD9FF','夜光粉':'#FF8ECF','夜光黄':'#FFF36B','夜光紫':'#B07CFF',
+  '糖果色':'#F77F9F','糖果':'#F77F9F','半透明绿':'#C8E6C9','半透明黄':'#FFF3C4','半透明红':'#F8C8C8',
+  '半透明蓝':'#C8DFF8','半透明紫':'#DCC8F0','半透明橙':'#FFD9B0','半透明':'#DCE9EE',
+  '珠光':'#F0E8E8','珠光变色龙':'#B8A8D8','变色龙':'#B8A8D8','闪耀':'#E8D8F0','闪粉':'#E8D8F0',
+  '极光':'#7FD8D0','极光色':'#7FD8D0','星云':'#6B5B95','银河':'#4A5B7B','流星':'#5A6B8B',
   // ── 英文名补充 ──
   'black':'#000000','white':'#FFFFFF','red':'#C12E1F','blue':'#0078BF','green':'#00BB31',
   'yellow':'#FCE300','orange':'#FF7F27','purple':'#8B5FBF','pink':'#FFC0CB','gray':'#808080',
@@ -1418,6 +2148,10 @@ const colorDB = {
   'orchid':'#DA70D6','plum':'#8B4587','chocolate':'#906557','sandybrown':'#F4A460',
   'honeydew':'#F0FFF0','seashell':'#FFF5EE','linen':'#FAF0E6','azure':'#007FFF',
   'cerulean':'#2A52BE','skyblue':'#87CEEB','royalblue':'#4169E1','midnightblue':'#191970',
+  'charcoal':'#3A3A3C','slate':'#5B7C99','taupe':'#8E7C6B','mauve':'#9B8FB3','mustard':'#E1B000',
+  'peach':'#FFCBA4','apricot':'#FBCEB1','lilac':'#C8A2C8','periwinkle':'#CCCCFF','aqua':'#00FFFF',
+  'jade':'#00A86B','emerald':'#50C878','ruby':'#E0115F','sapphire':'#0F52BA','amber':'#FFBF00',
+  'bronze':'#CD7F32','pearl':'#F0F0F0','matteblack':'#1A1A1A','glitter':'#E8D8F0','glow':'#D9F7F5',
 };
 
 // 从任意字符串中识别颜色（返回 {name, hex} 或 null）
@@ -1707,6 +2441,7 @@ function renderStats() {
   const inStock = data.filter(d => d.qty > 0).length;
   const totalKg = (data.reduce((s,d) => s + (d.weight * d.qty), 0) / 1000).toFixed(1);
   const withSpool = data.filter(d => d.hasSpool).length;
+  const finishedCount = data.filter(d => d.qty <= 0).length;
 
   document.getElementById('statsBar').innerHTML = `
     <div class="stat-card">
@@ -1720,6 +2455,10 @@ function renderStats() {
     <div class="stat-card">
       <div class="stat-label">总重量</div>
       <div class="stat-value">${totalKg} <span style="font-size:0.8rem;color:var(--text-3)">kg</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">已用完</div>
+      <div class="stat-value" style="color:var(--danger)">${finishedCount}</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">有料盘</div>
@@ -1782,6 +2521,7 @@ function getFiltered() {
     if (materialFilter !== 'all' && d.material !== materialFilter) return false;
     if (tagFilter !== 'all' && (!d.tags || !d.tags.includes(tagFilter))) return false;
     if (statusFilter === 'instock' && d.qty <= 0) return false;
+    if (statusFilter === 'finished' && d.qty > 0) return false;
     if (statusFilter === 'nospool' && d.hasSpool) return false;
     if (q && !d.name.toLowerCase().includes(q) && !d.brand.toLowerCase().includes(q) && !d.material.toLowerCase().includes(q) && (!d.tags || !d.tags.some(t => t.toLowerCase().includes(q)))) return false;
     return true;
@@ -1826,8 +2566,9 @@ function renderGrid(filtered) {
         ${spoolSvg(d.color, d.hasSpool)}
         ${!d.hasSpool ? '<div class="no-spool-badge">无料盘</div>' : ''}
         <div class="card-edit-overlay">
-          <button class="card-action-btn" onclick="event.stopPropagation();editFilament(${d.id})">编辑</button>
-          <button class="card-action-btn del" onclick="event.stopPropagation();deleteFilament(${d.id})">删除</button>
+          <button class="card-action-btn edit-only" onclick="event.stopPropagation();editFilament(${d.id})">编辑</button>
+          <button class="card-action-btn finish" onclick="event.stopPropagation();markFinished(${d.id})" title="${d.qty>0?'标记一卷使用完毕':'恢复一卷为可用'}">${d.qty>0?'用完':'恢复'}</button>
+          <button class="card-action-btn del edit-only" onclick="event.stopPropagation();deleteFilament(${d.id})">删除</button>
         </div>
       </div>
       <div class="card-body">
@@ -1836,6 +2577,7 @@ function renderGrid(filtered) {
           <span class="card-brand">${d.brand}</span>
           <span class="card-material">${d.material}</span>
           ${d.bambuCode ? `<span style="font-size:0.65rem;color:var(--accent);font-family:'Space Mono',monospace;background:var(--accent-dim);padding:1px 5px;border-radius:3px">#${d.bambuCode}</span>` : ''}
+          ${(n => n ? `<span class="finished-note${n.done ? ' done' : ''}">${n.text}</span>` : '')(finishedNote(d))}
         </div>
         ${d.tags && d.tags.length ? `<div class="card-tags">${d.tags.map(t => `<span class="tag-badge">${t}</span>`).join('')}</div>` : ''}
       </div>
@@ -1878,13 +2620,14 @@ function renderList(filtered) {
       </div>
       <div class="list-material-badge">${d.material}</div>
       <div class="list-weight" style="color:var(--text-2)">${d.weight}g</div>
-      <div class="list-qty" style="color:${d.qty===0?'var(--danger)':d.qty===1?'var(--warn)':'var(--text-1)'}">${d.qty}</div>
+      <div class="list-qty" style="color:${d.qty===0?'var(--danger)':d.qty===1?'var(--warn)':'var(--text-1)'}">${d.qty}${(n => n ? `<span class="list-qty-note ${n.done ? 'done' : 'warn'}">${n.text}</span>` : '')(finishedNote(d))}</div>
       <div class="list-spool">
         <span style="font-size:1rem">${d.hasSpool ? '✓' : '✗'}</span>
       </div>
       <div class="actions-cell">
         <button class="act-btn" onclick="event.stopPropagation();adjustQty(${d.id},-1)">-</button>
         <button class="act-btn" onclick="event.stopPropagation();adjustQty(${d.id},1)">+</button>
+        <button class="act-btn finish" onclick="event.stopPropagation();markFinished(${d.id})" title="${d.qty>0?'标记一卷使用完毕':'恢复一卷为可用'}">${d.qty>0?'用完':'恢复'}</button>
         <button class="act-btn success" onclick="event.stopPropagation();editFilament(${d.id})">编辑</button>
         <button class="act-btn danger" onclick="event.stopPropagation();deleteFilament(${d.id})">删除</button>
       </div>
@@ -1916,6 +2659,14 @@ function renderAll() {
   document.getElementById('filterAll').classList.toggle('active', statusFilter==='all');
   document.getElementById('filterInStock').classList.toggle('active', statusFilter==='instock');
   document.getElementById('filterNoSpool').classList.toggle('active', statusFilter==='nospool');
+  document.getElementById('filterFinished').classList.toggle('active', statusFilter==='finished');
+
+  const cfBtn = document.getElementById('clearFinishedBtn');
+  if (cfBtn) {
+    const n = data.filter(d => d.qty <= 0).length;
+    cfBtn.disabled = n === 0;
+    cfBtn.textContent = n ? `清理用完 (${n})` : '清理用完';
+  }
 
   if (editMode) updateBatchBar();
 }
@@ -2322,15 +3073,6 @@ function goBatchStep2() {
   )];
   if (rawNames.length === 0) return;
 
-  const matMap = {
-    'PLA Basic':'PLA','PLA Matte':'PLA','PLA Silk+':'SILK','PLA CF':'CF 碳纤维','PLA Lite':'PLA',
-    'PLA Marble':'PLA','PLA Wood':'PLA','PLA Glow':'PLA','PLA Sparkle':'PLA','PLA Metal':'PLA',
-    'PETG Basic':'PETG','PETG HF':'PETG','PETG CF':'PETG','PETG Translucent':'PETG',
-    'ABS':'ABS','ABS-GF':'ABS','ASA':'ASA',
-    'TPU for AMS':'TPU','TPU 95A HF':'TPU',
-    'PC':'PC','PA6-GF':'其他',
-  };
-
   batchParsed = rawNames.map(s => {
     // 1) 先尝试拓竹编号识别
     const m = s.match(/^(.*?)(\d{5})$/);
@@ -2515,6 +3257,7 @@ function saveBatchFilaments() {
       bambuCode: p.bambuCode || null,
       weight, qty, tags,
       hasSpool: batchStep2Spool,
+      finished: 0,
     });
   });
 
@@ -2528,6 +3271,46 @@ function handleCardClick(e, id) {
   if (editMode) { toggleSelect(id); return; }
   editFilament(id);
 }
+/* ══════════════════════════════
+   Finished ── 使用完毕
+   数据约定：qty = 剩余可用卷数，finished = 已用完卷数
+   总拥有 = qty + finished
+══════════════════════════════ */
+
+// 统一的提示文案
+function finishedNote(d) {
+  const fin = d.finished || 0;
+  if (d.qty <= 0) return { text: fin > 0 ? `已用完 ${fin} 卷` : '已用完', done: true };
+  if (fin > 0)    return { text: `用完 ${fin} 卷`, done: false };
+  return null;
+}
+
+// 标记一卷用完；若已全部用完则反向恢复一卷
+function markFinished(id) {
+  const d = data.find(x => x.id === id);
+  if (!d) return;
+  if (d.qty > 0) {
+    d.qty -= 1;
+    d.finished = (d.finished || 0) + 1;
+  } else {
+    d.qty += 1;
+    d.finished = Math.max(0, (d.finished || 0) - 1);
+  }
+  save(); renderAll();
+}
+
+// 删除所有已用完（剩余为 0）的耗材
+function clearFinished() {
+  const list = data.filter(d => d.qty <= 0);
+  if (!list.length) { alert('当前没有已用完的耗材'); return; }
+  if (!confirm(`确认删除 ${list.length} 条已用完的耗材记录？\n（${list.map(d => d.name).slice(0, 8).join('、')}${list.length > 8 ? ' 等' : ''}）\n此操作不可撤销。`)) return;
+  const ids = new Set(list.map(d => d.id));
+  data = data.filter(d => !ids.has(d.id));
+  selectedIds.clear();
+  save(); renderAll();
+  if (editMode) updateBatchBar();
+}
+
 function adjustQty(id, delta) {
   const d = data.find(x => x.id === id);
   if (!d) return;
@@ -2616,6 +3399,8 @@ function saveFilament() {
     qty: parseInt(document.getElementById('fQty').value) || 0,
     hasSpool: spoolState,
     tags,
+    // 编辑时保留「已用完卷数」
+    finished: editingId ? ((data.find(x => x.id === editingId) || {}).finished || 0) : 0,
   };
 
   if (editingId) {
@@ -2693,15 +3478,6 @@ function bambuLookup(code) {
     const [_, name, hex, matGroup] = match;
     document.getElementById('fName').value = bambuNameToCn(name);
     document.getElementById('fBrand').value = '拓竹';
-    // Map material group to dropdown value
-    const matMap = {
-      'PLA Basic':'PLA','PLA Matte':'PLA','PLA Silk+':'SILK','PLA CF':'CF 碳纤维','PLA Lite':'PLA',
-      'PLA Marble':'PLA','PLA Wood':'PLA','PLA Glow':'PLA','PLA Sparkle':'PLA','PLA Metal':'PLA',
-      'PETG Basic':'PETG','PETG HF':'PETG','PETG CF':'PETG','PETG Translucent':'PETG',
-      'ABS':'ABS','ABS-GF':'ABS','ASA':'ASA',
-      'TPU for AMS':'TPU','TPU 95A HF':'TPU',
-      'PC':'PC','PA6-GF':'其他',
-    };
     document.getElementById('fMaterial').value = matMap[matGroup] || 'PLA';
     setColor(hex);
     el.style.display = 'inline';
@@ -2727,6 +3503,946 @@ function buildPresetColors() {
 ══════════════════════════════ */
 buildPresetColors();
 renderAll();
+
+/* ══════════════════════════════════════════════════
+   色卡库（Swatch Library）
+   数据来源：拓竹官方编号色卡 + 通用中文色名库 + 品牌名录
+══════════════════════════════════════════════════ */
+
+const SW_FAMILIES = ['红','橙','棕','黄','绿','青','蓝','紫','粉','白','灰','黑'];
+const SW_FAM_COLOR = { '红':'#e04b4b','橙':'#f59042','棕':'#8b5e34','黄':'#f5d547','绿':'#4caf50',
+  '青':'#2ec4b6','蓝':'#4a90d9','紫':'#9b59b6','粉':'#f07fb0','白':'#f2f2f2','灰':'#9aa0a6','黑':'#22262c' };
+const SW_SORTS = [ {v:'default',t:'默认'}, {v:'hue',t:'按色相'}, {v:'name',t:'按名称'}, {v:'light',t:'按明度'} ];
+const SW_SRCS  = [ {v:'all',t:'全部来源',sub:'拓竹 + 通用'},
+                   {v:'bambu',t:'拓竹官方',sub:'含编号/材质系列'},
+                   {v:'generic',t:'通用色库',sub:'中文色名识别用'} ];
+
+let swAll = [], swList = [];
+let swViewMode = localStorage.getItem('swView') || 'grid';
+let swSrc = 'all', swFam = 'all', swSortBy = 'default';
+let swKeyword = '', swFavOnly = false, swCurIdx = -1;
+let swFavs = new Set(JSON.parse(localStorage.getItem('swFavs') || '[]'));
+
+/* ---------- 颜色工具 ---------- */
+function swHsl(hex) {
+  let h = String(hex || '').replace('#', '').trim();
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  if (h.length !== 6) return [0, 0, 0];
+  const r = parseInt(h.slice(0,2),16)/255, g = parseInt(h.slice(2,4),16)/255, b = parseInt(h.slice(4,6),16)/255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min;
+  const l = (max + min) / 2;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2*l - 1));
+  let hh = 0;
+  if (d) {
+    if (max === r)      hh = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) hh = (b - r) / d + 2;
+    else                hh = (r - g) / d + 4;
+    hh *= 60;
+  }
+  return [hh, s, l];
+}
+function swFamily(hex) {
+  const [h, s, l] = swHsl(hex);
+  // 先判无彩色（低饱和），否则浅粉、浅蓝会被亮度误判成白色
+  if (s <= 0.12) {
+    if (l >= 0.85) return '白';
+    if (l <= 0.18) return '黑';
+    return '灰';
+  }
+  if (h >= 12 && h < 45 && l < 0.42) return '棕';
+  if (h < 18 || h >= 348) return '红';
+  if (h >= 330) return '粉';
+  if (h < 45)  return '橙';
+  if (h < 70)  return '黄';
+  if (h < 165) return '绿';
+  if (h < 200) return '青';
+  if (h < 260) return '蓝';
+  if (h < 300) return '紫';
+  return '粉';
+}
+function swRgbOf(hex) {
+  let h = String(hex).replace('#','');
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  return `rgb(${parseInt(h.slice(0,2),16)}, ${parseInt(h.slice(2,4),16)}, ${parseInt(h.slice(4,6),16)})`;
+}
+function swHslText(hex) {
+  const [h,s,l] = swHsl(hex);
+  return `hsl(${Math.round(h)}, ${Math.round(s*100)}%, ${Math.round(l*100)}%)`;
+}
+function swKey(it) { return it.src + '|' + it.zh; }
+function swIsFav(it) { return swFavs.has(swKey(it)); }
+function swEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ---------- 数据构建 ---------- */
+function buildSwatches() {
+  const out = [], seen = new Set();
+  // 拓竹官方编号色卡
+  bambuFilaments.forEach(([code, en, hex, group]) => {
+    const zh = bambuNameToCn(en);
+    const k = zh + '|' + String(hex).toUpperCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push({ zh, en, hex, code, group, src:'bambu', srcLabel:'拓竹官方', material: matMap[group] || 'PLA' });
+  });
+  // 通用中文色名库
+  Object.keys(colorDB).forEach(zh => {
+    const hex = colorDB[zh];
+    const k = zh + '|' + String(hex).toUpperCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push({ zh, en:'', hex, code:'', group:'', src:'generic', srcLabel:'通用色库', material:'' });
+  });
+  return out;
+}
+
+function swInit() {
+  swAll = buildSwatches();
+  renderSwStats();
+  renderSwPanels();
+  renderSwBrandGrid();
+  renderSwatches();
+}
+
+/* ---------- 统计 ---------- */
+function renderSwStats() {
+  const nB = swAll.filter(x => x.src === 'bambu').length;
+  const nG = swAll.filter(x => x.src === 'generic').length;
+  document.getElementById('swStats').innerHTML = [
+    ['品牌', brandDB.length], ['拓竹官方色卡', nB], ['通用色名', nG],
+    ['色卡合计', swAll.length], ['我的收藏', swFavs.size],
+  ].map(([k,v]) => `<span class="sw-stat">${k} <b>${v}</b></span>`).join('');
+}
+
+/* ---------- 下拉面板 ---------- */
+function swCountSrc(v) { return v === 'all' ? swAll.length : swAll.filter(x => x.src === v).length; }
+function swCountFam(f) { return swAll.filter(x => swFamily(x.hex) === f).length; }
+
+function renderSwPanels() {
+  const srcP = document.getElementById('swSrcPanel');
+  srcP.innerHTML = SW_SRCS.map(o => `
+    <button class="sw-dd-item" role="option" aria-selected="${swSrc===o.v}" onclick="setSwSrc('${o.v}')">
+      <span>${o.t}</span><span style="font-size:.66rem;color:var(--text-3)">${o.sub}</span>
+      <span class="sw-dd-count">${swCountSrc(o.v)}</span>
+    </button>`).join('');
+  document.getElementById('swSrcVal').textContent = (SW_SRCS.find(o=>o.v===swSrc)||SW_SRCS[0]).t.replace('全部来源','全部');
+
+  const famP = document.getElementById('swFamPanel');
+  let fh = `<button class="sw-dd-item" role="option" aria-selected="${swFam==='all'}" onclick="setSwFam('all')">
+      <span>全部色系</span><span class="sw-dd-count">${swAll.length}</span></button>`;
+  SW_FAMILIES.forEach(f => {
+    const n = swCountFam(f);
+    if (!n) return;
+    fh += `<button class="sw-dd-item" role="option" aria-selected="${swFam===f}" onclick="setSwFam('${f}')">
+      <span class="sw-dot" style="background:${SW_FAM_COLOR[f]}"></span><span>${f}色系</span>
+      <span class="sw-dd-count">${n}</span></button>`;
+  });
+  famP.innerHTML = fh;
+  document.getElementById('swFamVal').textContent = swFam === 'all' ? '全部' : swFam;
+
+  const soP = document.getElementById('swSortPanel');
+  soP.innerHTML = SW_SORTS.map(o => `
+    <button class="sw-dd-item" role="option" aria-selected="${swSortBy===o.v}" onclick="setSwSort('${o.v}')">
+      <span>${o.t}</span></button>`).join('');
+  document.getElementById('swSortVal').textContent = (SW_SORTS.find(o=>o.v===swSortBy)||SW_SORTS[0]).t;
+}
+
+const SW_DD_CAP = { src:'Src', fam:'Fam', sort:'Sort' };
+function toggleSwDd(which) {
+  const cap = SW_DD_CAP[which];
+  const panel = document.getElementById('sw' + cap + 'Panel');
+  const btn = document.getElementById('sw' + cap + 'Btn');
+  const willOpen = panel.hidden;
+  closeSwDds();
+  if (willOpen) { panel.hidden = false; btn.setAttribute('aria-expanded','true'); }
+}
+function closeSwDds() {
+  Object.values(SW_DD_CAP).forEach(cap => {
+    const p = document.getElementById('sw'+cap+'Panel'); if (p) p.hidden = true;
+    const b = document.getElementById('sw'+cap+'Btn');   if (b) b.setAttribute('aria-expanded','false');
+  });
+}
+document.addEventListener('click', e => { if (!e.target.closest('.sw-dd')) closeSwDds(); });
+
+/* ---------- 筛选 / 排序 / 视图 ---------- */
+function setSwSrc(v)  { swSrc = v; closeSwDds(); renderSwPanels(); renderSwatches(); }
+function setSwFam(v)  { swFam = v; closeSwDds(); renderSwPanels(); renderSwatches(); }
+function setSwSort(v) { swSortBy = v; closeSwDds(); renderSwPanels(); renderSwatches(); }
+function toggleSwFavOnly() {
+  swFavOnly = !swFavOnly;
+  document.getElementById('swFavOnly').setAttribute('aria-pressed', String(swFavOnly));
+  renderSwatches();
+}
+function setSwView(v) {
+  swViewMode = v; localStorage.setItem('swView', v);
+  const g = document.getElementById('swVGrid'), l = document.getElementById('swVList');
+  g.classList.toggle('active', v==='grid'); l.classList.toggle('active', v==='list');
+  g.setAttribute('aria-pressed', String(v==='grid')); l.setAttribute('aria-pressed', String(v==='list'));
+  renderSwatches();
+}
+function onSwSearch() {
+  swKeyword = document.getElementById('swQ').value.trim();
+  document.getElementById('swQ').closest('.sw-search').classList.toggle('has-q', swKeyword.length > 0);
+  renderSwatches();
+}
+function clearSwQ() {
+  const el = document.getElementById('swQ');
+  el.value = ''; onSwSearch(); el.focus();
+}
+function resetSwFilters() {
+  swSrc='all'; swFam='all'; swSortBy='default'; swFavOnly=false; swKeyword='';
+  const el = document.getElementById('swQ');
+  el.value = '';
+  el.closest('.sw-search').classList.remove('has-q');
+  document.getElementById('swFavOnly').setAttribute('aria-pressed','false');
+  closeSwDds(); renderSwPanels(); renderSwatches();
+}
+
+function getSwList() {
+  const q = swKeyword.toLowerCase();
+  let list = swAll.filter(it => {
+    if (swSrc !== 'all' && it.src !== swSrc) return false;
+    if (swFam !== 'all' && swFamily(it.hex) !== swFam) return false;
+    if (swFavOnly && !swIsFav(it)) return false;
+    if (q) {
+      const hay = (it.zh + ' ' + it.en + ' ' + it.hex + ' ' + it.code + ' ' + it.group + ' ' + it.srcLabel).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  if (swSortBy === 'hue')        list = list.sort((a,b) => { const A=swHsl(a.hex), B=swHsl(b.hex); return A[0]-B[0] || A[2]-B[2]; });
+  else if (swSortBy === 'name')  list = list.sort((a,b) => a.zh.localeCompare(b.zh, 'zh-Hans-CN'));
+  else if (swSortBy === 'light') list = list.sort((a,b) => swHsl(b.hex)[2] - swHsl(a.hex)[2]);
+  else                           list = list.sort((a,b) => (a.src === b.src ? 0 : a.src === 'bambu' ? -1 : 1));
+  return list;
+}
+
+/* ---------- 渲染 ---------- */
+function renderSwatches() {
+  swList = getSwList();
+  const box = document.getElementById('swResults');
+  document.getElementById('swEmpty').hidden = swList.length > 0;
+  document.getElementById('swCount').innerHTML =
+    `共 <b>${swList.length}</b> 个颜色` + (swList.length !== swAll.length ? ` · 总库 ${swAll.length}` : '');
+
+  box.className = swViewMode === 'grid' ? 'sw-grid' : 'sw-list';
+  box.innerHTML = swList.map((it, i) => swViewMode === 'grid' ? swCardHtml(it, i) : swRowHtml(it, i)).join('');
+  renderSwActiveBar();
+}
+
+function swCardHtml(it, i) {
+  const zh = swEsc(it.zh), en = swEsc(it.en);
+  const fav = swIsFav(it);
+  return `<div class="sw-card${fav?' is-fav':''}" role="button" tabindex="0" data-i="${i}"
+    style="--d:${Math.min(i,18)*16}ms" onclick="openSwModal(${i})"
+    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openSwModal(${i})}">
+    <div class="sw-card-swatch" style="background:${it.hex}">
+      <span class="sw-card-hex">${String(it.hex).toUpperCase()}</span>
+      <span class="sw-card-fav">♥</span>
+      <div class="sw-card-acts">
+        <button class="sw-act" onclick="event.stopPropagation();swCopyHex('${it.hex}')" title="复制 HEX">HEX</button>
+        <button class="sw-act" onclick="event.stopPropagation();swToggleFav(${i})" title="收藏">${fav?'♥':'♡'}</button>
+        <button class="sw-act" onclick="event.stopPropagation();swQuickAdd(${i})" title="加入库存">＋</button>
+      </div>
+    </div>
+    <div class="sw-card-body">
+      <div class="sw-card-zh" title="${zh}">${zh}</div>
+      <div class="sw-card-en" title="${en || it.srcLabel}">${en || it.srcLabel}</div>
+      <div class="sw-card-meta">
+        ${it.code ? `<span class="sw-chip2 code">#${it.code}</span>` : ''}
+        ${it.group ? `<span class="sw-chip2">${swEsc(it.group)}</span>` : ''}
+        <span class="sw-chip2">${swFamily(it.hex)}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function swRowHtml(it, i) {
+  const zh = swEsc(it.zh);
+  const fav = swIsFav(it);
+  return `<div class="sw-row" role="button" tabindex="0" data-i="${i}" style="--d:${Math.min(i,18)*12}ms"
+    onclick="openSwModal(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openSwModal(${i})}" title="${zh}">
+    <div class="sw-row-sw" style="background:${it.hex}"></div>
+    <div>
+      <div class="sw-row-name">${zh}</div>
+      <div class="sw-row-sub">${swEsc(it.en || it.srcLabel)}${it.code ? ' · #'+it.code : ''}</div>
+    </div>
+    <div class="sw-row-sub">${it.srcLabel}${it.group ? ' · '+swEsc(it.group) : ''}</div>
+    <div class="sw-row-hex">${String(it.hex).toUpperCase()}</div>
+    <div class="sw-row-acts">
+      <button class="sw-act" style="position:static;background:var(--bg-3);color:var(--text-2)"
+        onclick="event.stopPropagation();swCopyHex('${it.hex}')">HEX</button>
+      <button class="sw-act" style="position:static;background:var(--bg-3);color:${fav?'var(--danger)':'var(--text-2)'}"
+        onclick="event.stopPropagation();swToggleFav(${i})">${fav?'♥':'♡'}</button>
+      <button class="sw-act" style="position:static;background:var(--bg-3);color:var(--text-2)"
+        onclick="event.stopPropagation();swQuickAdd(${i})">＋</button>
+    </div>
+  </div>`;
+}
+
+function renderSwActiveBar() {
+  const bar = document.getElementById('swActiveBar');
+  const chips = [];
+  if (swKeyword)  chips.push(['搜索：' + swKeyword, 'clearSwQ()']);
+  if (swSrc !== 'all')     chips.push(['来源：' + (SW_SRCS.find(o=>o.v===swSrc)||{}).t, "setSwSrc('all')"]);
+  if (swFam !== 'all')     chips.push([swFam + '色系', "setSwFam('all')"]);
+  if (swSortBy !== 'default') chips.push(['排序：' + (SW_SORTS.find(o=>o.v===swSortBy)||{}).t, "setSwSort('default')"]);
+  if (swFavOnly)   chips.push(['仅看收藏', 'toggleSwFavOnly()']);
+  bar.hidden = chips.length === 0;
+  bar.innerHTML = chips.map(([t, fn]) =>
+    `<span class="sw-chipx">${swEsc(t)}<button onclick="${fn}" aria-label="移除筛选">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button></span>`).join('') +
+    (chips.length > 1 ? `<button class="sw-clear-all" onclick="resetSwFilters()">清除全部</button>` : '');
+}
+
+/* ---------- 品牌名录 ---------- */
+function renderSwBrandGrid() {
+  document.getElementById('swBrandGrid').innerHTML = brandDB.map(b => {
+    const alias = b.aliases.filter(a => a !== b.canonical).slice(0, 2).join(' / ');
+    const safe = swEsc(b.canonical).replace(/'/g, "\\'");
+    return `<button class="sw-brand" onclick="swUseBrand('${safe}')">
+      <div class="sw-brand-name">${swEsc(b.canonical)}</div>
+      <div class="sw-brand-alias">${swEsc(alias || '—')}</div>
+    </button>`;
+  }).join('');
+}
+function swUseBrand(name) {
+  openModal();
+  const el = document.getElementById('fBrand');
+  if (el) el.value = name;
+  swToast('已打开添加面板，品牌已填入：' + name);
+}
+
+/* ---------- 收藏 ---------- */
+function swToggleFav(i) {
+  const it = swList[i];
+  if (!it) return;
+  const k = swKey(it);
+  const on = !swFavs.has(k);
+  if (on) swFavs.add(k); else swFavs.delete(k);
+  localStorage.setItem('swFavs', JSON.stringify([...swFavs]));
+  renderSwStats(); renderSwatches();
+  const modal = document.getElementById('swModal');
+  if (!modal.hidden && swCurIdx === i) swSyncFavBtn();
+  swToast(on ? '已收藏 ' + it.zh : '已取消收藏 ' + it.zh);
+}
+function swToggleFavCurrent() { if (swCurIdx >= 0) swToggleFav(swCurIdx); }
+function swSyncFavBtn() {
+  const it = swList[swCurIdx];
+  const btn = document.getElementById('swMFav');
+  if (it && btn) btn.textContent = swIsFav(it) ? '♥ 已收藏' : '♡ 收藏';
+}
+
+/* ---------- 复制 ---------- */
+function swCopyHex(hex) { swCopyText(String(hex).toUpperCase(), '已复制 ' + String(hex).toUpperCase()); }
+function swCopyCurrentHex() { const it = swList[swCurIdx]; if (it) swCopyHex(it.hex); }
+function swCopy(kind) {
+  const it = swList[swCurIdx];
+  if (!it) return;
+  const v = kind === 'hex' ? String(it.hex).toUpperCase()
+          : kind === 'rgb' ? swRgbOf(it.hex)
+          : swHslText(it.hex);
+  swCopyText(v);
+}
+function swCopyText(txt, msg) {
+  const done = () => swToast(msg || ('已复制 ' + txt));
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(done).catch(() => swFallbackCopy(txt, done));
+  } else swFallbackCopy(txt, done);
+}
+function swFallbackCopy(txt, cb) {
+  const ta = document.createElement('textarea');
+  ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); cb(); } catch (e) { swToast('复制失败：' + txt); }
+  document.body.removeChild(ta);
+}
+
+/* ---------- 详情弹窗 ---------- */
+function openSwModal(i) {
+  const it = swList[i];
+  if (!it) return;
+  swCurIdx = i;
+  document.getElementById('swMHero').style.background = it.hex;
+  document.getElementById('swMTitle').textContent = it.zh;
+  document.getElementById('swMSub').textContent =
+    [it.en, it.group, it.code ? '#'+it.code : ''].filter(Boolean).join(' · ') || it.srcLabel;
+  document.getElementById('swMTags').innerHTML = [
+    `<span class="sw-chip2">${it.srcLabel}</span>`,
+    it.code ? `<span class="sw-chip2 code">#${it.code}</span>` : '',
+    `<span class="sw-chip2">${swFamily(it.hex)}色系</span>`,
+    it.material ? `<span class="sw-chip2">${it.material}</span>` : '',
+  ].join('');
+  document.getElementById('swMHex').textContent = String(it.hex).toUpperCase();
+  document.getElementById('swMRgb').textContent = swRgbOf(it.hex);
+  document.getElementById('swMHsl').textContent = swHslText(it.hex);
+  swSyncFavBtn();
+  document.getElementById('swModal').hidden = false;
+}
+function closeSwModal() { document.getElementById('swModal').hidden = true; }
+function swStep(dir) {
+  if (!swList.length) return;
+  swCurIdx = (swCurIdx + dir + swList.length) % swList.length;
+  openSwModal(swCurIdx);
+}
+document.addEventListener('keydown', e => {
+  const modal = document.getElementById('swModal');
+  if (modal && !modal.hidden) {
+    if (e.key === 'Escape')           closeSwModal();
+    else if (e.key === 'ArrowLeft')   swStep(-1);
+    else if (e.key === 'ArrowRight')  swStep(1);
+    return;
+  }
+  // 「/」聚焦色卡搜索
+  if (e.key === '/' && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) {
+    const sw = document.getElementById('pageSwatch');
+    if (sw && !sw.hidden) { e.preventDefault(); document.getElementById('swQ').focus(); }
+  }
+});
+
+/* ---------- 加入库存 ---------- */
+function swFillForm(it) {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  set('fName', it.zh);
+  if (it.code) {
+    set('fBambuCode', it.code);
+    // 走一遍官方编号查询：自动显示「匹配」提示并同步材质 / 品牌 / 色值
+    if (typeof bambuLookup === 'function') bambuLookup(it.code);
+  }
+  if (it.src === 'bambu') {
+    set('fBrand', '拓竹');
+    if (it.material) set('fMaterial', it.material);
+  }
+  if (typeof setColor === 'function') setColor(it.hex);
+}
+function swQuickAdd(i) {
+  const it = swList[i];
+  if (!it) return;
+  closeSwModal();
+  openModal();
+  swFillForm(it);
+  swToast('已带入添加面板：' + it.zh);
+}
+function swAddToStock() {
+  const it = swList[swCurIdx];
+  if (!it) return;
+  closeSwModal();
+  openModal();
+  swFillForm(it);
+  swToast('已带入添加面板：' + it.zh);
+}
+
+/* ---------- Toast ---------- */
+let swToastTimer = null;
+function swToast(msg) {
+  const t = document.getElementById('swToast');
+  document.getElementById('swToastMsg').textContent = msg;
+  t.hidden = false;
+  clearTimeout(swToastTimer);
+  swToastTimer = setTimeout(() => { t.hidden = true; }, 1900);
+}
+
+/* ══════════════════════════════════════════
+   数据统计页（Statistics）
+══════════════════════════════════════════ */
+const ST_PALETTE = [
+  '#4dd9c0','#f2994a','#7b8cff','#f26d9b','#5ec26a','#f2c94c',
+  '#9d7bff','#4ea8de','#e86a5c','#63c7b2','#c9955f','#8896c9',
+  '#d4e157','#ff8a65','#4db6ac','#ba68c8'
+];
+const ST_CARDS = [
+  { id:'brand',    kind:'brand',    title:'品牌构成', sub:'哪个品牌的耗材最多', views:['donut','bars','table'], jump:true },
+  { id:'material', kind:'material', title:'材质构成', sub:'PLA / PETG / ABS … 占比', views:['donut','bars','table'], jump:true },
+  { id:'family',   kind:'family',   title:'色系构成', sub:'按色相归类你的配色库存', views:['donut','bars','table'], jump:true },
+  { id:'tag',      kind:'tag',      title:'标签构成', sub:'一条耗材可含多个标签', views:['bars','donut','table'], jump:true },
+  { id:'status',   kind:'status',   title:'库存状态', sub:'在库 vs 已消耗', views:['donut','bars','table'], jump:true },
+  { id:'weight',   kind:'weight',   title:'规格分布', sub:'单卷克重构成', views:['table','bars','donut'], jump:false },
+];
+const ST_ICONS = {
+  brand:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 9 5 4h14l2 5"/><path d="M9 13h6"/></svg>',
+  material:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 8 5-5 5 5"/><path d="m7 16 5 5 5-5"/><path d="M12 3v18"/></svg>',
+  family:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" opacity="0.35" stroke="none"/></svg>',
+  tag:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 12 22l-9-9V3h10z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg>',
+  status:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21a9 9 0 1 0-9-9"/><path d="M12 7v5l3 2"/><path d="M3 16h6"/></svg>',
+  weight:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h12l3 12H3z"/><path d="M12 7V4"/><path d="M9 4h6"/></svg>',
+  matrix:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>',
+  top:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/></svg>',
+};
+
+let stMetric = 'rolls';    // rolls | weight
+let stScope  = 'remain';   // remain | all | finished
+let stView   = { brand:'donut', material:'donut', family:'donut', tag:'bars', status:'donut', weight:'table' };
+let stSort   = {};         // cardId -> { key:'value'|'name'|'sku', dir:-1|1 }
+const stCache = {};        // cardId -> aggregated list
+
+/* ---------- 工具 ---------- */
+const stUnit = () => stMetric === 'weight' ? 'kg' : '卷';
+function stFmt(v) {
+  const n = Number(v) || 0;
+  return stMetric === 'weight' ? (Math.round(n * 100) / 100).toFixed(2) : String(Math.round(n));
+}
+function stPct(v, total) {
+  if (!total) return '0';
+  const p = (v / total) * 100;
+  return (p >= 10 ? p.toFixed(0) : p.toFixed(1)).replace(/\.0$/, '');
+}
+function stEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function stJs(s) {
+  return "'" + String(s == null ? '' : s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,' ') + "'";
+}
+function stToast(msg) { if (typeof swToast === 'function') swToast(msg); }
+
+/* 单条记录在当前「口径 + 范围」下的数值 */
+function stVal(d) {
+  const q = Math.max(0, Number(d.qty) || 0);
+  const f = Math.max(0, Number(d.finished) || 0);
+  const rolls = stScope === 'remain' ? q : stScope === 'all' ? q + f : f;
+  return stMetric === 'weight' ? rolls * (Number(d.weight) || 0) / 1000 : rolls;
+}
+
+/* ---------- 聚合 ---------- */
+function stAggregate(keyFn) {
+  const map = new Map();
+  data.forEach(d => {
+    const k = String(keyFn(d) == null ? '' : keyFn(d)).trim() || '未知';
+    const v = stVal(d);
+    let e = map.get(k);
+    if (!e) { e = { name:k, value:0, sku:0, hex:null, maxV:-1 }; map.set(k, e); }
+    e.value += v;
+    e.sku += 1;
+    if (v > e.maxV && d.color) { e.maxV = v; e.hex = d.color; }
+  });
+  return [...map.values()].sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+}
+function stTagList() {
+  const map = new Map();
+  data.forEach(d => {
+    const v = stVal(d);
+    const tags = (d.tags && d.tags.length) ? d.tags : ['未打标签'];
+    tags.forEach(t => {
+      let e = map.get(t);
+      if (!e) { e = { name:t, value:0, sku:0, hex:null, maxV:-1 }; map.set(t, e); }
+      e.value += v; e.sku += 1;
+      if (v > e.maxV && d.color) { e.maxV = v; e.hex = d.color; }
+    });
+  });
+  return [...map.values()].sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+}
+/* 状态分布不受「范围」影响，始终给出在库 / 已用完两项 */
+function stStatusList() {
+  const f = d => stMetric === 'weight' ? (Number(d.weight) || 0) / 1000 : 1;
+  const inV  = data.reduce((s, d) => s + Math.max(0, Number(d.qty) || 0) * f(d), 0);
+  const finV = data.reduce((s, d) => s + Math.max(0, Number(d.finished) || 0) * f(d), 0);
+  return [
+    { name:'有库存', value:inV,  sku:data.filter(d => (Number(d.qty) || 0) > 0).length, hex:'#5ec26a' },
+    { name:'已用完', value:finV, sku:data.filter(d => (Number(d.finished) || 0) > 0).length, hex:'#e86a5c' },
+  ].filter(x => x.value > 0);
+}
+function stListBy(kind) {
+  let list;
+  if (kind === 'brand')        list = stAggregate(d => (d.brand || '').trim());
+  else if (kind === 'material')list = stAggregate(d => d.material);
+  else if (kind === 'family')  list = stAggregate(d => (typeof swFamily === 'function' ? swFamily(d.color) : '其他'));
+  else if (kind === 'weight')  list = stAggregate(d => (Number(d.weight) || 0) + 'g');
+  else if (kind === 'tag')     list = stTagList();
+  else if (kind === 'status')  list = stStatusList();
+  else list = [];
+  list = list.filter(x => x.value > 0.0001);
+  const useReal = (kind === 'family');
+  list.forEach((x, i) => {
+    x.color = useReal ? (x.hex || ST_PALETTE[i % ST_PALETTE.length])
+      : kind === 'status' ? (x.name === '已用完' ? 'oklch(65% 0.22 25)' : 'oklch(72% 0.18 145)')
+      : ST_PALETTE[i % ST_PALETTE.length];
+  });
+  return list;
+}
+
+/* ---------- 视图：环形 ---------- */
+function stDonut(cfg, list, total) {
+  const R = 58, C = 2 * Math.PI * R;
+  let acc = 0;
+  const arcs = list.map((it, i) => {
+    const len = total ? (it.value / total) * C : 0;
+    const gap = (list.length > 1 && len > 7) ? 2.4 : 0;
+    const dash = Math.max(0.001, len - gap);
+    const off = -acc; acc += len;
+    const pct = stPct(it.value, total);
+    return `<circle class="st-arc" cx="80" cy="80" r="${R}" fill="none" stroke="${it.color}" stroke-width="26"
+      stroke-dasharray="${dash.toFixed(2)} ${(C - dash).toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}"
+      transform="rotate(-90 80 80)" onmousemove="stHover('${cfg.id}',${i})" onmouseleave="stHover('${cfg.id}',-1)"
+      onclick="stJump('${cfg.kind}',${stJs(it.name)})"><title>${stEsc(it.name)} · ${stFmt(it.value)}${stUnit()} · ${pct}%</title></circle>`;
+  }).join('');
+  return `<div class="st-split">
+    <div class="st-donut-wrap">
+      <svg class="st-donut" viewBox="0 0 160 160" role="img" aria-label="${stEsc(cfg.title)}环形图">
+        <circle cx="80" cy="80" r="${R}" fill="none" stroke="oklch(22% 0.012 240)" stroke-width="26"></circle>
+        ${arcs}
+      </svg>
+      <div class="st-donut-mid">
+        <div class="v">${stFmt(total)}<small>${stUnit()}</small></div>
+        <div class="k">${list.length} 个分类</div>
+        <div class="p">合计 100%</div>
+      </div>
+    </div>
+    ${stLegend(cfg, list, total)}
+  </div>`;
+}
+function stLegend(cfg, list, total) {
+  return `<div class="st-legend">${list.map((it, i) => `
+    <div class="st-lg" onmouseenter="stHover('${cfg.id}',${i})" onmouseleave="stHover('${cfg.id}',-1)"
+         onclick="stJump('${cfg.kind}',${stJs(it.name)})" title="点击在库存中筛选「${stEsc(it.name)}」">
+      <span class="st-lg-dot" style="background:${it.color}"></span>
+      <span class="st-lg-name">${stEsc(it.name)}<small>${it.sku} 条</small></span>
+      <span class="st-lg-val">${stFmt(it.value)}${stUnit()}</span>
+      <span class="st-lg-pct">${stPct(it.value, total)}%</span>
+    </div>`).join('')}</div>`;
+}
+function stHover(cardId, i) {
+  const card = document.querySelector('.st-card[data-id="' + cardId + '"]');
+  if (!card) return;
+  const list = stCache[cardId] || [];
+  const total = list.reduce((s, x) => s + x.value, 0);
+  const mid = card.querySelector('.st-donut-mid');
+  const it = i >= 0 ? list[i] : null;
+  if (mid) {
+    mid.innerHTML = it
+      ? `<div class="v">${stFmt(it.value)}<small>${stUnit()}</small></div><div class="k">${stEsc(it.name)}</div><div class="p">${stPct(it.value, total)}% · ${it.sku} 条</div>`
+      : `<div class="v">${stFmt(total)}<small>${stUnit()}</small></div><div class="k">${list.length} 个分类</div><div class="p">合计 100%</div>`;
+  }
+  card.querySelectorAll('.st-arc').forEach((a, k) => {
+    a.classList.toggle('hot', i >= 0 && k === i);
+    a.classList.toggle('dim', i >= 0 && k !== i);
+  });
+  card.querySelectorAll('.st-lg').forEach((el, k) => el.classList.toggle('hot', i >= 0 && k === i));
+}
+
+/* ---------- 视图：条形 ---------- */
+function stBars(cfg, list, total) {
+  const max = Math.max(...list.map(x => x.value), 0);
+  return `<div class="st-bars">${list.map(it => `
+    <div class="st-bar" onclick="stJump('${cfg.kind}',${stJs(it.name)})" title="点击在库存中筛选「${stEsc(it.name)}」">
+      <span class="st-bar-name">${stEsc(it.name)}</span>
+      <span class="st-bar-track"><span class="st-bar-fill" style="width:${max ? (it.value / max * 100).toFixed(2) : 0}%;background:${it.color}"></span></span>
+      <span class="st-bar-val">${stFmt(it.value)}${stUnit()} <i>· ${stPct(it.value, total)}%</i></span>
+    </div>`).join('')}</div>`;
+}
+
+/* ---------- 视图：表格 ---------- */
+function stTable(cfg, list, total) {
+  const max = Math.max(...list.map(x => x.value), 0);
+  const st = stSort[cfg.id] || { key:'value', dir:-1 };
+  const arrow = k => st.key === k ? (st.dir < 0 ? ' ▼' : ' ▲') : '';
+  const th = (k, label, cls) =>
+    `<th class="${cls || ''} ${st.key === k ? 'sorted' : ''}" onclick="setStSort('${cfg.id}','${k}')" title="点击排序">${label}${arrow(k)}</th>`;
+  return `<div class="st-tbl-wrap"><table class="st-table">
+    <thead><tr>
+      ${th('name', cfg.kind === 'family' ? '色系' : cfg.kind === 'weight' ? '规格' : '项目')}
+      ${th('value', stMetric === 'weight' ? '重量 / kg' : '卷数', 'num')}
+      ${th('value', '占比', 'num')}
+      <th>分布</th>
+      ${th('sku', '条目', 'num')}
+    </tr></thead>
+    <tbody>${list.map(it => `
+      <tr onclick="stJump('${cfg.kind}',${stJs(it.name)})" title="点击在库存中筛选">
+        <td class="nm">${cfg.kind === 'family' ? `<span class="st-sw" style="background:${it.color}"></span>` : ''}${stEsc(it.name)}</td>
+        <td class="num">${stFmt(it.value)}</td>
+        <td class="num">${stPct(it.value, total)}%</td>
+        <td><span class="st-mini-track"><span class="st-mini-fill" style="width:${max ? (it.value / max * 100).toFixed(1) : 0}%;background:${it.color}"></span></span></td>
+        <td class="num">${it.sku}</td>
+      </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+/* ---------- 卡片 ---------- */
+const stViewName = { donut:'环形', bars:'条形', table:'表格' };
+function renderStCard(cfg) {
+  const raw = stListBy(cfg.kind);
+  const st = stSort[cfg.id] || { key:'value', dir:-1 };
+  const list = [...raw].sort((a, b) => {
+    const r = st.key === 'name' ? a.name.localeCompare(b.name, 'zh') : (a[st.key] || 0) - (b[st.key] || 0);
+    return (r || a.name.localeCompare(b.name, 'zh')) * st.dir;
+  });
+  stCache[cfg.id] = list;
+  const total = list.reduce((s, x) => s + x.value, 0);
+  const view = stView[cfg.id] || cfg.views[0];
+  let body = '';
+  if (!list.length) {
+    body = `<div class="st-empty-sub" style="padding:18px 0;text-align:center">当前口径下暂无数据</div>`;
+  } else if (view === 'donut') body = stDonut(cfg, list, total);
+  else if (view === 'bars')   body = stBars(cfg, list, total);
+  else                        body = stTable(cfg, list, total);
+
+  const segs = cfg.views.map(v =>
+    `<button class="${view === v ? 'active' : ''}" onclick="setStView('${cfg.id}','${v}')" title="${stViewName[v]}视图">${stViewName[v]}</button>`
+  ).join('');
+
+  const note = cfg.kind === 'tag'
+    ? `<div class="st-note">标签可多选，同一卷会计入多个标签，因此占比之和可能超过 100%。</div>`
+    : cfg.kind === 'status'
+    ? `<div class="st-note">「已用完」按累计消耗统计，不受上方「范围」选项影响。</div>`
+    : cfg.jump ? `<div class="st-note">点击图表中的任意一项 → 自动跳转库存页并筛选该类耗材。</div>` : '';
+
+  return `<div class="st-card" data-id="${cfg.id}">
+    <div class="st-card-head">
+      <div class="st-card-ico">${ST_ICONS[cfg.id] || ''}</div>
+      <div class="st-card-t">
+        <div class="st-card-title">${stEsc(cfg.title)}</div>
+        <div class="st-card-sub">${stEsc(cfg.sub)} · ${list.length} 项 · 合计 ${stFmt(total)}${stUnit()}</div>
+      </div>
+      <div class="st-card-tools"><div class="st-seg mini" role="group" aria-label="${stEsc(cfg.title)}视图切换">${segs}</div></div>
+    </div>
+    <div class="st-body">${body}</div>
+    ${note}
+  </div>`;
+}
+
+/* ---------- 品牌 × 材质 交叉表 ---------- */
+function stMatrixCard() {
+  const unit = stUnit();
+  const brandOrder = stListBy('brand').map(x => x.name);
+  const matOrder   = stListBy('material').map(x => x.name);
+  const bs = brandOrder.length ? brandOrder : [...new Set(data.map(d => (d.brand || '').trim() || '未知'))];
+  const ms = matOrder.length ? matOrder : [...new Set(data.map(d => d.material || '未知'))];
+  if (!bs.length || !ms.length) return '';
+  const cell = (b, m) => data.filter(d => ((d.brand || '').trim() || '未知') === b && (d.material || '未知') === m)
+    .reduce((s, d) => s + stVal(d), 0);
+  const flat = [];
+  let grand = 0;
+  const rows = bs.map(b => {
+    const vals = ms.map(m => { const v = cell(b, m); flat.push(v); return v; });
+    const rowTotal = vals.reduce((s, v) => s + v, 0); grand += rowTotal;
+    return { b, vals, rowTotal };
+  });
+  const maxV = Math.max(...flat, 0);
+  const colTotals = ms.map((m, j) => rows.reduce((s, r) => s + r.vals[j], 0));
+  const bg = v => maxV ? `background:rgba(77,217,192,${(0.06 + 0.6 * (v / maxV)).toFixed(3)})` : '';
+
+  return `<div class="st-card wide" data-id="matrix">
+    <div class="st-card-head">
+      <div class="st-card-ico">${ST_ICONS.matrix}</div>
+      <div class="st-card-t">
+        <div class="st-card-title">品牌 × 材质 交叉表</div>
+        <div class="st-card-sub">单元格 = 该品牌该材质的${unit === 'kg' ? '重量（kg）' : '卷数'}，颜色越深数值越大</div>
+      </div>
+    </div>
+    <div class="st-mx-wrap"><table class="st-mx">
+      <thead><tr><th>品牌 \\ 材质</th>${ms.map(m => `<th>${stEsc(m)}</th>`).join('')}<th>合计</th></tr></thead>
+      <tbody>${rows.map(r => `<tr>
+        <th>${stEsc(r.b)}</th>
+        ${r.vals.map((v, j) => `<td class="cell ${v ? '' : 'zero'}" style="${bg(v)}" onclick="stJumpMatrix(${stJs(r.b)},${stJs(ms[j])})" title="${stEsc(r.b)} · ${stEsc(ms[j])}：${stFmt(v)}${unit}">${v ? stFmt(v) : '–'}</td>`).join('')}
+        <td style="font-weight:700">${stFmt(r.rowTotal)}</td>
+      </tr>`).join('')}</tbody>
+      <tfoot><tr><th>合计</th>${colTotals.map(v => `<td>${stFmt(v)}</td>`).join('')}<td>${stFmt(grand)}</td></tr></tfoot>
+    </table></div>
+    <div class="st-note">点击单元格 → 同时按品牌与材质筛选库存。</div>
+  </div>`;
+}
+
+/* ---------- TOP 排行 ---------- */
+function stTopCard() {
+  const total = data.reduce((s, d) => s + stVal(d), 0);
+  const rows = data.map(d => ({ d, v: stVal(d) })).filter(x => x.v > 0.0001)
+    .sort((a, b) => b.v - a.v).slice(0, 10);
+  if (!rows.length) return '';
+  const max = rows[0].v;
+  return `<div class="st-card wide" data-id="top">
+    <div class="st-card-head">
+      <div class="st-card-ico">${ST_ICONS.top}</div>
+      <div class="st-card-t">
+        <div class="st-card-title">库存 TOP 10 排行</div>
+        <div class="st-card-sub">按当前口径（${stMetric === 'weight' ? '重量' : '卷数'} · ${stScope === 'remain' ? '剩余库存' : stScope === 'all' ? '含已用完' : '仅已用完'}）排序</div>
+      </div>
+    </div>
+    <div class="st-tbl-wrap"><table class="st-table">
+      <thead><tr>
+        <th style="width:32px">#</th><th>耗材</th><th>品牌</th><th>材质</th>
+        <th class="num">${stMetric === 'weight' ? '重量 / kg' : '卷数'}</th><th class="num">占比</th><th>分布</th>
+      </tr></thead>
+      <tbody>${rows.map((x, i) => `
+        <tr onclick="stJump('color',${stJs(x.d.name)})" title="点击在库存中搜索该耗材">
+          <td class="num" style="color:var(--text-3)">${i + 1}</td>
+          <td class="nm"><span class="st-sw" style="background:${x.d.color}"></span>${stEsc(x.d.name)}</td>
+          <td>${stEsc(x.d.brand || '未知')}</td>
+          <td>${stEsc(x.d.material || '未知')}</td>
+          <td class="num">${stFmt(x.v)}</td>
+          <td class="num">${stPct(x.v, total)}%</td>
+          <td><span class="st-mini-track"><span class="st-mini-fill" style="width:${(x.v / max * 100).toFixed(1)}%;background:${x.d.color}"></span></span></td>
+        </tr>`).join('')}</tbody>
+    </table></div>
+    <div class="st-note">点击任意行 → 在库存页搜索该耗材名称。</div>
+  </div>`;
+}
+
+/* ---------- KPI ---------- */
+function stKpisHtml() {
+  const rolls = data.reduce((s, d) => s + Math.max(0, Number(d.qty) || 0), 0);
+  const kg    = data.reduce((s, d) => s + Math.max(0, Number(d.qty) || 0) * (Number(d.weight) || 0) / 1000, 0);
+  const fin   = data.reduce((s, d) => s + Math.max(0, Number(d.finished) || 0), 0);
+  const finKg = data.reduce((s, d) => s + Math.max(0, Number(d.finished) || 0) * (Number(d.weight) || 0) / 1000, 0);
+  const brands = stListBy('brand'), mats = stListBy('material'), fams = stListBy('family');
+  const spool = data.filter(d => d.hasSpool).length;
+  const spoolPct = data.length ? Math.round(spool / data.length * 100) : 0;
+  const avg = rolls ? kg / rolls : 0;
+  const unit = stUnit();
+  const cur = data.reduce((s, d) => s + stVal(d), 0);
+  const top1 = (l) => l.length ? l[0].name + ' ' + stFmt(l[0].value) + unit : '—';
+
+  const items = [
+    { c:'a', l:'当前口径合计', v:stFmt(cur), u:unit, s:stMetric === 'weight' ? '按重量统计' : '按卷数统计' },
+    { c:'s', l:'库存卷数', v:String(rolls), u:'卷', s:'剩余可用' },
+    { c:'', l:'库存重量', v:kg.toFixed(1), u:'kg', s:'单卷均重 ' + avg.toFixed(2) + ' kg' },
+    { c:'d', l:'已用完', v:String(fin), u:'卷', s:finKg.toFixed(1) + ' kg 已消耗' },
+    { c:'w', l:'品牌数', v:String(brands.length), s:'最多：' + top1(brands) },
+    { c:'p', l:'材质数', v:String(mats.length), s:'最多：' + top1(mats) },
+    { c:'', l:'色系数', v:String(fams.length), s:'最多：' + top1(fams) },
+    { c:'', l:'有料盘', v:spoolPct + '', u:'%', s:spool + ' / ' + data.length + ' 条带料盘' },
+  ];
+  return items.map(it => `
+    <div class="st-kpi ${it.c}">
+      <div class="st-kpi-label">${it.l}</div>
+      <div class="st-kpi-value">${it.v}${it.u ? `<small>${it.u}</small>` : ''}</div>
+      <div class="st-kpi-sub">${stEsc(it.s)}</div>
+    </div>`).join('');
+}
+
+/* ---------- 控制栏 / 主渲染 ---------- */
+function stSyncCtrl() {
+  const isW = stMetric === 'weight';
+  document.getElementById('stMRolls').classList.toggle('active', !isW);
+  document.getElementById('stMWeight').classList.toggle('active', isW);
+  const segIds = { remain:'stSRemain', all:'stSAll', finished:'stSFin' };
+  Object.keys(segIds).forEach(s => {
+    document.getElementById(segIds[s]).classList.toggle('active', stScope === s);
+  });
+  const rolls = data.reduce((s, d) => s + Math.max(0, Number(d.qty) || 0), 0);
+  const kg = data.reduce((s, d) => s + Math.max(0, Number(d.qty) || 0) * (Number(d.weight) || 0) / 1000, 0);
+  const scopeTxt = stScope === 'remain' ? '剩余库存' : stScope === 'all' ? '含已用完' : '仅已用完';
+  document.getElementById('stMeta').innerHTML =
+    `共 <b>${data.length}</b> 条耗材 · <b>${rolls}</b> 卷 / <b>${kg.toFixed(1)}</b> kg 在库 · 当前为「<b>${isW ? '重量' : '卷数'}</b> · ${scopeTxt}」`;
+}
+function setStMetric(m) { stMetric = m; renderStatsPage(); }
+function setStScope(s)  { stScope = s; renderStatsPage(); }
+function setStView(id, v) { stView[id] = v; renderStatsPage(); }
+function setStSort(id, key) {
+  const cur = stSort[id] || { key:'value', dir:-1 };
+  stSort[id] = cur.key === key ? { key, dir: -cur.dir } : { key, dir: key === 'name' ? 1 : -1 };
+  renderStatsPage();
+}
+
+function renderStatsPage() {
+  const has = data.length > 0;
+  document.getElementById('stEmpty').hidden = has;
+  document.getElementById('stKpis').hidden = !has;
+  document.getElementById('stCards').hidden = !has;
+  stSyncCtrl();
+  if (!has) { document.getElementById('stKpis').innerHTML = ''; document.getElementById('stCards').innerHTML = ''; return; }
+  document.getElementById('stKpis').innerHTML = stKpisHtml();
+  document.getElementById('stCards').innerHTML =
+    ST_CARDS.map(renderStCard).join('') + stMatrixCard() + stTopCard();
+}
+
+/* ---------- 跳转库存并筛选 ---------- */
+function stJump(kind, name) {
+  brandFilter = 'all'; materialFilter = 'all'; tagFilter = 'all'; statusFilter = 'all';
+  const si = document.getElementById('searchInput');
+  if (si) si.value = '';
+  if (kind === 'brand')          brandFilter = name;
+  else if (kind === 'material')  materialFilter = name;
+  else if (kind === 'tag') {
+    if (name === '未打标签') {
+      switchPage('inventory'); renderAll();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      stToast('这些耗材还没有标签，无法按标签筛选');
+      return;
+    }
+    tagFilter = name;
+  }
+  else if (kind === 'status')    statusFilter = name === '已用完' ? 'finished' : 'instock';
+  else if (kind === 'color' || kind === 'family') { if (si) si.value = name; }
+  switchPage('inventory');
+  renderAll();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  stToast('已筛选：' + name);
+}
+function stJumpMatrix(brand, material) {
+  brandFilter = brand; materialFilter = material; tagFilter = 'all'; statusFilter = 'all';
+  const si = document.getElementById('searchInput');
+  if (si) si.value = '';
+  switchPage('inventory');
+  renderAll();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  stToast('已筛选：' + brand + ' · ' + material);
+}
+
+/* ---------- 导出 CSV ---------- */
+function exportStatsCsv() {
+  const unit = stUnit();
+  const L = [];
+  L.push(['耗材库存统计报告']);
+  L.push(['导出时间', new Date().toLocaleString('zh-CN')]);
+  L.push(['统计口径', stMetric === 'weight' ? '重量(kg)' : '卷数']);
+  L.push(['统计范围', stScope === 'remain' ? '剩余库存' : stScope === 'all' ? '含已用完' : '仅已用完']);
+  L.push([]);
+  const addDim = (label, list) => {
+    const total = list.reduce((s, x) => s + x.value, 0);
+    L.push([label]);
+    L.push(['项目', stMetric === 'weight' ? '重量(kg)' : '卷数', '占比(%)', '条目数']);
+    list.forEach(x => L.push([x.name, stFmt(x.value), stPct(x.value, total), x.sku]));
+    L.push(['合计', stFmt(total), '100', list.reduce((s, x) => s + x.sku, 0)]);
+    L.push([]);
+  };
+  ['brand', 'material', 'family', 'tag', 'status', 'weight'].forEach(k => addDim(
+    ({ brand:'品牌', material:'材质', family:'色系', tag:'标签', status:'库存状态', weight:'规格' })[k], stListBy(k)));
+
+  L.push(['库存明细']);
+  L.push(['名称', '品牌', '材质', '颜色HEX', '规格(g)', '库存卷数', '已用完卷数', '库存重量(kg)', '有料盘', '标签']);
+  data.forEach(d => L.push([
+    d.name, d.brand || '', d.material || '', d.color || '', d.weight || '',
+    Number(d.qty) || 0, Number(d.finished) || 0,
+    ((Number(d.qty) || 0) * (Number(d.weight) || 0) / 1000).toFixed(2),
+    d.hasSpool ? '是' : '否',
+    (d.tags || []).join(' / ')
+  ]));
+
+  const csv = '\ufeff' + L.map(r => r.map(c => `"${String(c == null ? '' : c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const d = new Date();
+  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  a.href = url; a.download = `耗材统计_${stamp}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  stToast('统计已导出为 CSV');
+}
+
+/* ---------- 页面切换 ---------- */
+function switchPage(p) {
+  const map = { inventory:'pageInventory', swatch:'pageSwatch', stats:'pageStats' };
+  const tabMap = { inventory:'tabInventory', swatch:'tabSwatch', stats:'tabStats' };
+  Object.keys(map).forEach(k => {
+    const el = document.getElementById(map[k]);
+    if (!el) return;
+    el.classList.toggle('active', k === p);
+    el.hidden = k !== p;
+    const t = document.getElementById(tabMap[k]);
+    if (t) { t.classList.toggle('active', k === p); t.setAttribute('aria-selected', String(k === p)); }
+  });
+  if (p === 'swatch') {
+    if (!swAll.length) swInit();
+    else { renderSwStats(); renderSwatches(); }
+    setSwView(swViewMode);   // 同步视图按钮态
+  }
+  if (p === 'stats') renderStatsPage();
+}
+
+swInit();
+renderStatsPage();
 </script>
 </body>
 </html>
