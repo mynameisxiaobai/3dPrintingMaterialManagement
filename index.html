@@ -1242,6 +1242,65 @@
     .st-donut-wrap, .st-donut { width: 152px; height: 152px; }
     .st-donut-mid { padding: 0 30px; }
   }
+
+  /* ══════════════ 数据管理页 ══════════════ */
+  .st-card.danger { border-color: oklch(from var(--danger) l c h / 0.4); }
+  .dm-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .dm-note { font-size: 0.72rem; color: var(--text-3); line-height: 1.65; margin-top: 10px; }
+  .dm-note b { color: var(--text-2); font-weight: 600; }
+
+  /* 拖拽 / 选择文件 */
+  .dm-drop {
+    border: 1.5px dashed var(--border-hi); border-radius: var(--r-lg);
+    padding: 24px 18px; text-align: center; cursor: pointer;
+    background: var(--bg-3); transition: border-color 0.16s, background 0.16s;
+  }
+  .dm-drop:hover, .dm-drop.over { border-color: var(--accent); background: var(--accent-dim); }
+  .dm-drop-ico { font-size: 1.5rem; opacity: 0.6; margin-bottom: 5px; line-height: 1; }
+  .dm-drop-t { font-size: 0.86rem; font-weight: 600; color: var(--text-1); }
+  .dm-drop-s { font-size: 0.73rem; color: var(--text-3); margin-top: 4px; }
+
+  /* 导入预览 */
+  .dm-preview { border: 1px solid var(--border-hi); border-radius: var(--r); background: var(--bg-3); padding: 12px 14px; margin-top: 12px; }
+  .dm-pv-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 9px; }
+  .dm-pv-file { font-size: 0.85rem; font-weight: 650; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+  .dm-pv-sub { font-size: 0.73rem; color: var(--text-3); }
+  .dm-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .dm-pill { font-size: 0.7rem; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border-hi); color: var(--text-2); font-family: var(--font-mono); }
+  .dm-pill.new { border-color: oklch(from var(--success) l c h / 0.5); color: var(--success); }
+  .dm-pill.dup { border-color: oklch(from var(--warn) l c h / 0.5); color: var(--warn); }
+  .dm-pill.bad { border-color: oklch(from var(--danger) l c h / 0.5); color: var(--danger); }
+  .dm-pv-acts { display: flex; gap: 8px; align-items: center; margin-top: 11px; flex-wrap: wrap; }
+  .dm-pv-acts .spacer { flex: 1; }
+
+  /* 列表（回收站 / 导入条目） */
+  .dm-list { display: flex; flex-direction: column; gap: 5px; max-height: 296px; overflow-y: auto; padding-right: 3px; }
+  .dm-list::-webkit-scrollbar { width: 6px; }
+  .dm-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+  .dm-item {
+    display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 10px;
+    background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--r); padding: 7px 10px;
+  }
+  .dm-item:hover { border-color: var(--border-hi); }
+  .dm-item .t { font-size: 0.82rem; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dm-item .s { font-size: 0.7rem; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dm-sq { width: 20px; height: 20px; border-radius: 5px; border: 1px solid oklch(100% 0 0 / 0.2); }
+  .dm-mini { display: inline-flex; gap: 5px; }
+  .dm-empty-sm { font-size: 0.78rem; color: var(--text-3); padding: 18px 0; text-align: center; }
+
+  /* 存储占用 */
+  .dm-meter { height: 9px; background: var(--bg-3); border: 1px solid var(--border); border-radius: 99px; overflow: hidden; margin: 10px 0 8px; }
+  .dm-meter-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), oklch(74% 0.17 320)); transition: width 0.4s; }
+  .dm-kv { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.78rem; padding: 5px 0; border-bottom: 1px solid oklch(24% 0.012 240); }
+  .dm-kv:last-child { border-bottom: none; }
+  .dm-kv span { color: var(--text-3); }
+  .dm-kv b { font-family: var(--font-mono); color: var(--text-1); font-weight: 600; }
+
+  @media (max-width: 720px) {
+    .dm-pv-file { max-width: 150px; }
+    .dm-item { grid-template-columns: 20px 1fr; }
+    .dm-item .dm-mini { grid-column: 2; }
+  }
 </style>
 </head>
 <body>
@@ -1289,6 +1348,10 @@
     <button class="page-tab" id="tabStats" role="tab" aria-selected="false" onclick="switchPage('stats')">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="21" x2="21" y2="21"/><rect x="5" y="12" width="4" height="7" rx="1"/><rect x="11" y="7" width="4" height="12" rx="1"/><rect x="17" y="3" width="4" height="16" rx="1"/></svg>
       数据统计
+    </button>
+    <button class="page-tab" id="tabData" role="tab" aria-selected="false" onclick="switchPage('data')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/><path d="M4 11.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
+      数据管理
     </button>
   </div>
 
@@ -1518,6 +1581,157 @@
       <button class="st-btn primary" onclick="openModal()">添加耗材</button>
     </div>
 
+  </div>
+
+  <!-- ══════════ 页面：数据管理 ══════════ -->
+  <div class="page" id="pageData" hidden>
+
+    <div class="st-hero">
+      <div class="st-hero-txt">
+        <div class="st-hero-title">数据管理 · 备份 / 导入 / 清理</div>
+        <div class="st-hero-sub">数据只存在这台电脑的浏览器本地。换浏览器、清缓存、换电脑都会丢——所以「导出 JSON 备份」是唯一能完整迁移的方式（含耗材、标签、色卡收藏）。CSV 适合丢进 Excel 批量改完再导回来。所有删除都会先进回收站，误删可一键还原。</div>
+      </div>
+      <div class="st-hero-acts">
+        <button class="st-btn primary" onclick="dmExportJson()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          导出 JSON 备份
+        </button>
+        <button class="st-btn" onclick="switchPage('inventory')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
+          返回库存
+        </button>
+      </div>
+    </div>
+
+    <div class="st-kpis" id="dmKpis"></div>
+
+    <div class="st-cards">
+
+      <!-- 导出 -->
+      <div class="st-card">
+        <div class="st-card-head">
+          <div class="st-card-ico">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </div>
+          <div class="st-card-t">
+            <div class="st-card-title">导出数据</div>
+            <div class="st-card-sub">三种用途各不同，按需选择</div>
+          </div>
+        </div>
+        <div class="dm-acts">
+          <button class="st-btn primary" onclick="dmExportJson()">JSON 完整备份</button>
+          <button class="st-btn" onclick="dmExportCsv()">CSV 库存明细</button>
+          <button class="st-btn" onclick="exportStatsCsv()">CSV 统计报告</button>
+          <button class="st-btn" onclick="dmCopyBackup()">复制到剪贴板</button>
+        </div>
+        <div class="dm-note">
+          <b>JSON 备份</b>——包含耗材、标签池、色卡收藏，可在任意设备原样恢复，推荐定期保存。<br>
+          <b>CSV 明细</b>——一行一卷，Excel / 数字表格可直接编辑，改完从右侧「导入」再导回。<br>
+          <b>复制到剪贴板</b>——没权限写文件时，可粘到备忘录里当临时备份。
+        </div>
+      </div>
+
+      <!-- 导入 -->
+      <div class="st-card">
+        <div class="st-card-head">
+          <div class="st-card-ico">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <div class="st-card-t">
+            <div class="st-card-title">导入数据</div>
+            <div class="st-card-sub">支持 JSON 备份与 CSV 表格，导入前可预览</div>
+          </div>
+        </div>
+        <div class="dm-drop" id="dmDrop"
+             onclick="dmPickFile()"
+             ondragover="event.preventDefault();this.classList.add('over')"
+             ondragleave="this.classList.remove('over')"
+             ondrop="dmOnDrop(event)">
+          <div class="dm-drop-ico">📥</div>
+          <div class="dm-drop-t">点击选择文件，或把文件拖到这里</div>
+          <div class="dm-drop-s">支持 .json 备份文件 / .csv 表格（UTF-8）</div>
+        </div>
+        <div id="dmPreview"></div>
+        <input type="file" id="dmFileInput" accept=".json,.csv,.txt" hidden onchange="dmOnFile(event)">
+      </div>
+
+      <!-- 存储占用 -->
+      <div class="st-card">
+        <div class="st-card-head">
+          <div class="st-card-ico">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/><path d="M4 11.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
+          </div>
+          <div class="st-card-t">
+            <div class="st-card-title">本地存储占用</div>
+            <div class="st-card-sub">浏览器给单个网站通常只有 5 MB</div>
+          </div>
+        </div>
+        <div id="dmStorage"></div>
+      </div>
+
+      <!-- 整理工具 -->
+      <div class="st-card">
+        <div class="st-card-head">
+          <div class="st-card-ico">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
+          </div>
+          <div class="st-card-t">
+            <div class="st-card-title">整理与修复</div>
+            <div class="st-card-sub">一键把脏数据收拾干净</div>
+          </div>
+        </div>
+        <div class="dm-acts">
+          <button class="st-btn" onclick="dmDedupe()">合并完全重复项</button>
+          <button class="st-btn" onclick="dmRenormalize()">修复非法字段</button>
+          <button class="st-btn" onclick="dmPruneTags()">清理未使用标签</button>
+        </div>
+        <div class="dm-note">
+          <b>合并重复项</b>——名称、品牌、材质、色值四项完全相同的记录会并成一条，数量相加。<br>
+          <b>修复非法字段</b>——补齐缺失字段、修正非法色值与负数数量（旧版本残留数据专用）。<br>
+          <b>清理未使用标签</b>——删掉标签池里没有任何耗材在用的标签。
+        </div>
+      </div>
+
+      <!-- 回收站 -->
+      <div class="st-card wide">
+        <div class="st-card-head">
+          <div class="st-card-ico">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
+          </div>
+          <div class="st-card-t">
+            <div class="st-card-title">回收站</div>
+            <div class="st-card-sub" id="dmTrashSub">最近删除的耗材会在这里保留，可随时还原</div>
+          </div>
+          <div class="st-card-tools">
+            <button class="st-btn" id="dmTrashRestoreAll" onclick="dmRestoreAllTrash()">全部还原</button>
+            <button class="st-btn" id="dmTrashEmpty" onclick="dmEmptyTrash()">清空回收站</button>
+          </div>
+        </div>
+        <div id="dmTrash"></div>
+      </div>
+
+      <!-- 危险区 -->
+      <div class="st-card danger">
+        <div class="st-card-head">
+          <div class="st-card-ico" style="color:var(--danger)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div class="st-card-t">
+            <div class="st-card-title">危险操作</div>
+            <div class="st-card-sub">以下操作都会先把当前数据存入回收站</div>
+          </div>
+        </div>
+        <div class="dm-acts">
+          <button class="st-btn" onclick="dmLoadSample()">恢复示例数据</button>
+          <button class="st-btn" onclick="dmClearAll()" style="border-color:oklch(from var(--danger) l c h / 0.55);color:var(--danger)">清空全部耗材</button>
+        </div>
+        <div class="dm-note">
+          <b>恢复示例数据</b>会用 8 条内置示例替换当前库存（想从零开始时很好用）。<br>
+          <b>清空全部耗材</b>只清耗材，标签池与色卡收藏保留。
+        </div>
+      </div>
+
+    </div>
   </div>
 
 </main>
@@ -3348,11 +3562,12 @@ function updateAllVisuals() {
 function batchDelete() {
   const n = selectedIds.size;
   if (n === 0) return;
-  if (!confirm(`确认删除选中的${n} 条耗材记录？此操作不可撤销。`)) return;
+  if (!confirm(`确认删除选中的${n} 条耗材记录？删除后可在「数据管理 → 回收站」还原。`)) return;
+  pushTrash(data.filter(x => selectedIds.has(x.id)));
   data = data.filter(x => !selectedIds.has(x.id));
   selectedIds.clear();
   save(); updateBatchBar(); renderAll();
-  toast(`已删除 ${n} 条耗材`, 'ok');
+  toast(`已删除 ${n} 条耗材，可在回收站还原`, 'ok');
 }
 
 /* ══════════════════════════════
@@ -3916,11 +4131,12 @@ function clearFinished() {
   if (!confirm(`确认删除 ${list.length} 条已用完的耗材记录？\n（${list.map(d => d.name).slice(0, 8).join('、')}${list.length > 8 ? ' 等' : ''}）\n此操作不可撤销。`)) return;
   const n = list.length;
   const ids = new Set(list.map(d => d.id));
+  pushTrash(list);
   data = data.filter(d => !ids.has(d.id));
   selectedIds.clear();
   save(); renderAll();
   if (editMode) updateBatchBar();
-  toast(`已清理 ${n} 条用完记录`, 'ok');
+  toast(`已清理 ${n} 条用完记录，可在回收站还原`, 'ok');
 }
 
 function adjustQty(id, delta) {
@@ -3934,18 +4150,20 @@ function adjustQty(id, delta) {
 function deleteFilament(id) {
   const d = data.find(x => x.id === id);
   if (!confirm('确认删除这条耗材记录?')) return;
+  pushTrash([d]);
   data = data.filter(x => x.id !== id);
   save(); renderAll();
-  toast(`已删除「${d ? d.name : '该耗材'}」`, 'ok');
+  toast(`已删除「${d ? d.name : '该耗材'}」，可在回收站还原`, 'ok');
 }
 
 function deleteFromModal() {
   if (!editingId) return;
   const d = data.find(x => x.id === editingId);
   if (!confirm('确认删除这条耗材记录?')) return;
+  pushTrash([d]);
   data = data.filter(x => x.id !== editingId);
   save(); closeModal(); renderAll();
-  toast(`已删除「${d ? d.name : '该耗材'}」`, 'ok');
+  toast(`已删除「${d ? d.name : '该耗材'}」，可在回收站还原`, 'ok');
 }
 
 /* ══════════════════════════════
@@ -5045,11 +5263,510 @@ function exportStatsCsv() {
   stToast('统计已导出为 CSV');
 }
 
+/* ══════════════════════════════
+   数据管理页 —— 导出 / 导入 / 回收站 / 整理
+   数据只在 localStorage，清理缓存或换机就会全丢，
+   所以导出 JSON 备份是唯一能完整迁移的方式。
+══════════════════════════════ */
+const DM_STORE_KEYS = [
+  ['filaments', '耗材库存'],
+  ['savedTags', '标签池'],
+  ['swFavs',    '色卡收藏'],
+  ['trash',     '回收站'],
+];
+const DM_QUOTA = 5 * 1024 * 1024;          // 浏览器单站配额通常 5MB
+const DM_TRASH_MAX = 60;
+
+let trash = [];        // [{ item, at }]
+let dmPending = null;  // 待导入：{ kind, items, mode, fileName, note, tagPool, favPool, skipped }
+
+function dmStamp() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+}
+function dmDownload(filename, text, mime) {
+  const blob = new Blob([text], { type: mime || 'application/json;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+function dmPersistFavs() {
+  try { localStorage.setItem('swFavs', JSON.stringify([...swFavs])); } catch (e) { /* 配额满时忽略 */ }
+}
+function dmRecalcNextId() {
+  nextId = data.reduce((m, d) => Math.max(m, Number.isFinite(d.id) ? d.id : 0), 0) + 1;
+}
+
+/* ── 回收站 ── */
+function loadTrash() {
+  const raw = lsGet('trash', []);
+  trash = Array.isArray(raw)
+    ? raw.filter(x => x && x.item).slice(-DM_TRASH_MAX).map(x => ({ item: normalizeItem(x.item), at: x.at || '' }))
+    : [];
+}
+function persistTrash() {
+  try { localStorage.setItem('trash', JSON.stringify(trash)); } catch (e) { /* 配额满时忽略 */ }
+}
+function pushTrash(items) {
+  if (!items || !items.length) return;
+  const at = new Date().toISOString();
+  items.forEach(d => trash.push({ item: JSON.parse(JSON.stringify(d)), at }));
+  while (trash.length > DM_TRASH_MAX) trash.shift();
+  persistTrash();
+  const pg = document.getElementById('pageData');
+  if (pg && !pg.hidden) renderTrashCard();
+}
+
+/* ── 导出 ── */
+function dmBackupObj() {
+  return {
+    app: 'filament-manager',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    counts: { filaments: data.length, tags: savedTags.size, favs: swFavs.size },
+    filaments: data,
+    savedTags: [...savedTags],
+    swFavs: [...swFavs],
+  };
+}
+function dmExportJson() {
+  try {
+    dmDownload(`耗材库存_备份_${dmStamp()}.json`, JSON.stringify(dmBackupObj(), null, 2));
+    toast(`备份已导出：${data.length} 条耗材 · ${savedTags.size} 个标签`, 'ok');
+  } catch (e) {
+    toast('导出失败：' + e.message, 'err');
+  }
+}
+function dmExportCsv() {
+  const L = [['名称', '品牌', '材质', '颜色HEX', '拓竹编号', '规格(g)', '库存卷数', '已用完卷数', '有料盘', '标签']];
+  data.forEach(d => L.push([
+    d.name, d.brand || '', d.material || '', d.color || '', d.bambuCode || '', d.weight || '',
+    Number(d.qty) || 0, Number(d.finished) || 0, d.hasSpool ? '是' : '否', (d.tags || []).join('/'),
+  ]));
+  const csv = '\ufeff' + L.map(r => r.map(c => `"${String(c == null ? '' : c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  dmDownload(`耗材明细_${dmStamp()}.csv`, csv, 'text/csv;charset=utf-8;');
+  toast(`已导出 ${data.length} 条明细为 CSV`, 'ok');
+}
+function dmCopyBackup() {
+  const txt = JSON.stringify(dmBackupObj());
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(
+      () => toast('备份 JSON 已复制到剪贴板', 'ok'),
+      () => dmFallbackCopy(txt));
+  } else dmFallbackCopy(txt);
+}
+function dmFallbackCopy(txt) {
+  const ta = document.createElement('textarea');
+  ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  document.body.removeChild(ta);
+  toast(ok ? '备份 JSON 已复制到剪贴板' : '复制失败，请改用「导出 JSON 备份」', ok ? 'ok' : 'err');
+}
+
+/* ── 导入：CSV 解析 ── */
+const DM_CSV_FIELDS = {
+  name:      ['名称', '耗材名称', '颜色名称', '品名', 'name', 'colorname', 'color name'],
+  brand:     ['品牌', '厂商', 'brand', 'manufacturer'],
+  material:  ['材质', '材料', 'material', 'type'],
+  color:     ['颜色', '色值', '颜色hex', '色号', 'color', 'hex', 'hexcolor'],
+  bambuCode: ['编号', '拓竹编号', '物料编号', 'bambucode', 'code', 'sku'],
+  weight:    ['规格', '重量', '克重', '单卷重量', 'weight', 'weightg'],
+  qty:       ['数量', '卷数', '库存', '剩余', 'qty', 'quantity', 'stock'],
+  finished:  ['已用完', '用完', 'finished', 'used'],
+  hasSpool:  ['料盘', '有料盘', 'hasspool', 'spool'],
+  tags:      ['标签', 'tags', 'tag'],
+};
+const DM_CSV_FALLBACK = ['name', 'brand', 'material', 'color', 'weight', 'qty', 'finished', '', 'hasSpool', 'tags'];
+
+function dmParseCsv(text) {
+  const s = String(text == null ? '' : text).replace(/^\ufeff/, '');
+  const rows = [];
+  let row = [], cur = '', q = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) {
+      if (c === '"') { if (s[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+      else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(cur); cur = ''; }
+    else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+    else if (c !== '\r') cur += c;
+  }
+  row.push(cur); rows.push(row);
+  return rows.filter(r => r.some(x => String(x).trim() !== ''));
+}
+function dmNormHead(s) { return String(s == null ? '' : s).toLowerCase().replace(/[\s()（）]/g, ''); }
+function dmCsvHeaderMap(row) {
+  const cols = []; let score = 0;
+  row.forEach(cell => {
+    const h = dmNormHead(cell);
+    let f = '';
+    Object.keys(DM_CSV_FIELDS).some(k => {
+      if (DM_CSV_FIELDS[k].some(a => dmNormHead(a) === h)) { f = k; return true; }
+      return false;
+    });
+    cols.push(f);
+    if (f) score++;
+  });
+  return { cols, score };
+}
+function dmCsvRowToItem(row, cols) {
+  const o = {};
+  cols.forEach((f, i) => { if (f && row[i] != null) o[f] = String(row[i]).trim(); });
+  if (!o.name && !o.brand && !o.color && !o.material) return null;
+  const digits = v => String(v).replace(/[^\d.]/g, '');
+  if (o.weight != null)   o.weight = digits(o.weight);
+  if (o.qty != null)      o.qty = digits(o.qty);
+  if (o.finished != null) o.finished = digits(o.finished);
+  if (o.color) {
+    let c = String(o.color).trim();
+    if (c && c[0] !== '#') c = '#' + c;
+    o.color = c;
+  }
+  if (o.hasSpool != null) {
+    const v = String(o.hasSpool).trim().toLowerCase();
+    o.hasSpool = !(v === '否' || v === 'no' || v === 'false' || v === '0' || v === '无' || v === '');
+  }
+  if (o.tags) o.tags = String(o.tags).split(/[\/、|]/).map(x => x.trim()).filter(Boolean);
+  return o;
+}
+
+/* ── 导入：入口 ── */
+function dmPickFile() {
+  const i = document.getElementById('dmFileInput');
+  if (i) i.click();
+}
+function dmOnFile(e) {
+  const f = e.target.files && e.target.files[0];
+  if (f) dmReadFile(f);
+  e.target.value = '';   // 允许连续导入同一个文件
+}
+function dmOnDrop(e) {
+  e.preventDefault();
+  const box = document.getElementById('dmDrop');
+  if (box) box.classList.remove('over');
+  const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) dmReadFile(f);
+}
+function dmReadFile(f) {
+  const isCsv = /\.csv$/i.test(f.name || '');
+  const r = new FileReader();
+  r.onload = () => dmParseImport(String(r.result == null ? '' : r.result), isCsv ? 'csv' : 'json', f.name || '导入文件');
+  r.onerror = () => toast('文件读取失败', 'err');
+  try { r.readAsText(f, 'utf-8'); } catch (e) { toast('文件读取失败', 'err'); }
+}
+function dmParseImport(text, kind, fileName) {
+  if (kind === 'json') {
+    let obj = null;
+    try { obj = JSON.parse(text); }
+    catch (e) { toast('JSON 解析失败：文件不是合法的 JSON', 'err'); return; }
+    const raw = Array.isArray(obj) ? obj
+      : Array.isArray(obj.filaments) ? obj.filaments
+      : Array.isArray(obj.data) ? obj.data : null;
+    if (!raw || !raw.length) { toast('文件里没有找到耗材数组', 'err'); return; }
+    dmPending = {
+      kind: 'json', mode: 'merge', fileName,
+      items: raw.map(x => normalizeItem(x)),
+      note: obj.exportedAt ? '备份于 ' + new Date(obj.exportedAt).toLocaleString('zh-CN') : '',
+      tagPool: Array.isArray(obj.savedTags) ? obj.savedTags : null,
+      favPool: Array.isArray(obj.swFavs) ? obj.swFavs : null,
+    };
+  } else {
+    const rows = dmParseCsv(text);
+    if (!rows.length) { toast('CSV 里没有可识别的数据行', 'err'); return; }
+    const map = dmCsvHeaderMap(rows[0]);
+    const hasHeader = map.score >= 2;
+    const body = hasHeader ? rows.slice(1) : rows;
+    const cols = hasHeader ? map.cols : DM_CSV_FALLBACK;
+    const items = [];
+    let skipped = 0;
+    body.forEach(r => { const o = dmCsvRowToItem(r, cols); if (o) items.push(normalizeItem(o)); else skipped++; });
+    if (!items.length) { toast('没有解析出任何有效耗材行', 'err'); return; }
+    dmPending = {
+      kind: 'csv', mode: 'merge', fileName, items, skipped,
+      note: hasHeader ? '已自动识别表头' : '未识别到表头，按默认列顺序读取',
+    };
+  }
+  dmRenderPreview();
+  toast(`已解析 ${dmPending.items.length} 条，确认后再写入`, 'info');
+}
+function dmKey(d) {
+  return [d.name, d.brand, d.material, d.color]
+    .map(v => String(v == null ? '' : v).trim().toLowerCase()).join('|');
+}
+function dmSetMode(m) { if (dmPending) { dmPending.mode = m; dmRenderPreview(); } }
+function dmCancelImport() { dmPending = null; dmRenderPreview(); toast('已取消导入', 'info'); }
+function dmRenderPreview() {
+  const box = document.getElementById('dmPreview');
+  if (!box) return;
+  const p = dmPending;
+  if (!p) { box.innerHTML = ''; return; }
+  const exist = new Set(data.map(dmKey));
+  const isDup = it => exist.has(dmKey(it));
+  let nNew = 0, nDup = 0;
+  p.items.forEach(it => { isDup(it) ? nDup++ : nNew++; });
+  const modes = [['merge', '跳过重复'], ['add', '数量累加'], ['replace', '替换全部']];
+  const desc = {
+    merge: '只导入本地没有的；已存在的记录保持原样。',
+    add: '已存在的记录把卷数相加，适合补录同一批货。',
+    replace: '清空现有库存，完全用文件里的数据替换（现有数据先存入回收站）。',
+  }[p.mode];
+  const rows = p.items.slice(0, 8).map(it => `<div class="dm-item">
+      <div class="dm-sq" style="background:${esc(it.color)}"></div>
+      <div><div class="t">${esc(it.name)}</div>
+        <div class="s">${esc(it.brand)} · ${esc(it.material)} · ${it.weight}g · ${it.qty}卷${it.bambuCode ? ' · #' + esc(it.bambuCode) : ''}</div></div>
+      <div class="dm-mini"><span class="dm-pill ${isDup(it) ? 'dup' : 'new'}">${isDup(it) ? '重复' : '新增'}</span></div>
+    </div>`).join('');
+  box.innerHTML = `<div class="dm-preview">
+    <div class="dm-pv-head">
+      <span class="dm-pv-file">${esc(p.fileName)}</span>
+      <span class="dm-pv-sub">${p.kind === 'json' ? 'JSON 备份' : 'CSV 表格'}${p.note ? ' · ' + esc(p.note) : ''}</span>
+    </div>
+    <div class="dm-pills">
+      <span class="dm-pill">共 ${p.items.length} 条</span>
+      <span class="dm-pill new">新增 ${nNew}</span>
+      <span class="dm-pill dup">重复 ${nDup}</span>
+      ${p.skipped ? `<span class="dm-pill bad">忽略 ${p.skipped}</span>` : ''}
+    </div>
+    <div class="dm-list" style="margin-top:10px">${rows}
+      ${p.items.length > 8 ? `<div class="dm-empty-sm">…还有 ${p.items.length - 8} 条未列出</div>` : ''}
+    </div>
+    <div class="dm-pv-acts">
+      <div class="st-seg mini" role="group" aria-label="导入模式">
+        ${modes.map(([v, t]) => `<button class="${p.mode === v ? 'active' : ''}" onclick="dmSetMode('${v}')">${t}</button>`).join('')}
+      </div>
+      <span class="spacer"></span>
+      <button class="st-btn" onclick="dmCancelImport()">取消</button>
+      <button class="st-btn primary" onclick="dmConfirmImport()">确认导入</button>
+    </div>
+    <div class="dm-note">${esc(desc)}</div>
+  </div>`;
+}
+function dmConfirmImport() {
+  const p = dmPending;
+  if (!p || !p.items.length) return;
+  if (p.mode === 'replace') {
+    if (!confirm(`「替换全部」会清空当前 ${data.length} 条记录，改为导入的 ${p.items.length} 条。\n当前数据会先存入回收站，可在回收站还原。\n\n是否继续？`)) return;
+    pushTrash(data);
+    data = p.items.map((d, i) => normalizeItem(d, i));
+    dmRecalcNextId();
+  } else {
+    const exist = new Map();
+    data.forEach(d => exist.set(dmKey(d), d));
+    let added = 0, merged = 0;
+    p.items.forEach(it => {
+      const k = dmKey(it);
+      const hit = exist.get(k);
+      if (hit) {
+        if (p.mode === 'add') {
+          hit.qty = (Number(hit.qty) || 0) + (Number(it.qty) || 0);
+          hit.finished = (Number(hit.finished) || 0) + (Number(it.finished) || 0);
+          merged++;
+        }
+      } else {
+        const n = normalizeItem(it);
+        n.id = nextId++;
+        data.push(n);
+        exist.set(k, n);
+        added++;
+      }
+    });
+    dmRecalcNextId();
+    if (!added && !merged) { toast('没有写入任何记录：全部与现有耗材重复', 'warn'); return; }
+    p._added = added; p._merged = merged;
+  }
+  if (p.tagPool && p.tagPool.length) {
+    p.tagPool.forEach(t => savedTags.add(t));
+    persistSavedTags();
+  }
+  if (p.favPool && p.favPool.length) {
+    p.favPool.forEach(f => swFavs.add(f));
+    dmPersistFavs();
+  }
+  save(); renderAll(); renderDataPage();
+  const msg = p.mode === 'replace'
+    ? `已替换为 ${p.items.length} 条耗材`
+    : `已新增 ${p._added || 0} 条${p._merged ? `，${p._merged} 条数量已累加` : ''}`;
+  toast(msg, 'ok');
+  dmPending = null;
+  dmRenderPreview();
+}
+
+/* ── 存储占用 ── */
+function dmByteLen(s) {
+  try { return new Blob([s]).size; } catch (e) { return String(s).length * 2; }
+}
+function dmFmtBytes(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1048576).toFixed(2) + ' MB';
+}
+function renderStorageCard() {
+  const el = document.getElementById('dmStorage');
+  if (!el) return;
+  let total = 0;
+  const rows = DM_STORE_KEYS.map(([k, label]) => {
+    let raw = '';
+    try { raw = localStorage.getItem(k) || ''; } catch (e) { raw = ''; }
+    const n = dmByteLen(raw); total += n;
+    return `<div class="dm-kv"><span>${esc(label)} <span style="opacity:.5">${k}</span></span><b>${dmFmtBytes(n)}</b></div>`;
+  }).join('');
+  const pct = Math.min(100, total / DM_QUOTA * 100);
+  el.innerHTML = `
+    <div class="dm-meter"><div class="dm-meter-fill" style="width:${pct.toFixed(2)}%"></div></div>
+    <div class="dm-kv"><span>已用 / 约 5 MB 配额</span><b>${dmFmtBytes(total)} · ${pct.toFixed(1)}%</b></div>
+    ${rows}
+    <div class="dm-note">占比超过 <b>80%</b> 就该收拾了：清理用完的记录、合并重复项，或者先导出一份 JSON 备份再清空。</div>`;
+}
+
+/* ── 回收站卡片 ── */
+function renderTrashCard() {
+  const box = document.getElementById('dmTrash');
+  if (!box) return;
+  const sub = document.getElementById('dmTrashSub');
+  const bAll = document.getElementById('dmTrashRestoreAll');
+  const bEmpty = document.getElementById('dmTrashEmpty');
+  if (sub) sub.textContent = trash.length
+    ? `${trash.length} 条待处理 · 最多保留最近 ${DM_TRASH_MAX} 条`
+    : '最近删除的耗材会在这里保留，可随时还原';
+  if (bAll) bAll.disabled = !trash.length;
+  if (bEmpty) bEmpty.disabled = !trash.length;
+  if (!trash.length) {
+    box.innerHTML = `<div class="dm-empty-sm">回收站是空的 —— 删除耗材、批量删除、清理用完都会先放到这里</div>`;
+    return;
+  }
+  const out = [];
+  for (let i = trash.length - 1; i >= 0; i--) {
+    const t = trash[i], d = t.item;
+    let when = '—';
+    try { when = t.at ? new Date(t.at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'; } catch (e) { when = '—'; }
+    out.push(`<div class="dm-item">
+      <div class="dm-sq" style="background:${esc(d.color)}"></div>
+      <div><div class="t">${esc(d.name)}</div>
+        <div class="s">${esc(d.brand)} · ${esc(d.material)} · ${d.qty}卷 · 删除于 ${esc(when)}</div></div>
+      <div class="dm-mini"><button class="sw-btn" style="padding:4px 10px;font-size:.72rem" onclick="dmRestoreTrash(${i})">还原</button></div>
+    </div>`);
+  }
+  box.innerHTML = `<div class="dm-list">${out.join('')}</div>`;
+}
+function dmRestoreTrash(i) {
+  const t = trash[i];
+  if (!t) return;
+  const d = normalizeItem(t.item);
+  d.id = nextId++;
+  data.push(d);
+  trash.splice(i, 1);
+  persistTrash(); save(); renderAll(); renderDataPage();
+  toast(`已还原「${d.name}」`, 'ok');
+}
+function dmRestoreAllTrash() {
+  if (!trash.length) return;
+  const n = trash.length;
+  trash.forEach(t => { const d = normalizeItem(t.item); d.id = nextId++; data.push(d); });
+  trash = [];
+  persistTrash(); save(); renderAll(); renderDataPage();
+  toast(`已还原 ${n} 条耗材`, 'ok');
+}
+function dmEmptyTrash() {
+  if (!trash.length) return;
+  if (!confirm(`确认永久删除回收站里的 ${trash.length} 条记录？此操作不可撤销。`)) return;
+  trash = [];
+  persistTrash(); renderDataPage();
+  toast('回收站已清空', 'ok');
+}
+
+/* ── 整理与修复 ── */
+function dmDedupe() {
+  if (!data.length) { toast('当前没有任何耗材', 'warn'); return; }
+  const map = new Map(), out = [], gone = [];
+  let merged = 0;
+  data.forEach(d => {
+    const k = dmKey(d);
+    if (map.has(k)) {
+      const t = map.get(k);
+      t.qty = (Number(t.qty) || 0) + (Number(d.qty) || 0);
+      t.finished = (Number(t.finished) || 0) + (Number(d.finished) || 0);
+      gone.push(d); merged++;
+    } else { map.set(k, d); out.push(d); }
+  });
+  if (!merged) { toast('没有完全重复的耗材', 'warn'); return; }
+  pushTrash(gone);
+  data = out;
+  save(); renderAll(); renderDataPage();
+  toast(`已合并 ${merged} 条重复记录，数量已累加`, 'ok');
+}
+function dmRenormalize() {
+  if (!data.length) { toast('当前没有任何耗材', 'warn'); return; }
+  const before = JSON.stringify(data);
+  data = data.map((d, i) => normalizeItem(d, i));
+  const changed = JSON.stringify(data) !== before;
+  dmRecalcNextId(); save(); renderAll(); renderDataPage();
+  toast(changed ? '已修复非法字段（色值 / 数量 / 缺失项）' : '数据已经是干净的，无需修复', changed ? 'ok' : 'warn');
+}
+function dmPruneTags() {
+  const used = new Set();
+  data.forEach(d => (d.tags || []).forEach(t => used.add(t)));
+  const before = savedTags.size;
+  [...savedTags].forEach(t => { if (!used.has(t)) savedTags.delete(t); });
+  const n = before - savedTags.size;
+  persistSavedTags(); renderAll(); renderDataPage();
+  toast(n ? `已清理 ${n} 个没有耗材在用的标签` : '标签池里没有闲置标签', n ? 'ok' : 'warn');
+}
+
+/* ── 危险区 ── */
+function dmLoadSample() {
+  if (!confirm('会用 8 条内置示例替换当前全部耗材。\n当前数据会先存入回收站（可在回收站还原）。\n\n是否继续？')) return;
+  pushTrash(data);
+  data = DEFAULT_DATA.map((d, i) => normalizeItem(d, i));
+  selectedIds.clear();
+  dmRecalcNextId(); save(); renderAll(); renderDataPage();
+  toast('已恢复为示例数据', 'ok');
+}
+function dmClearAll() {
+  if (!data.length) { toast('当前没有任何耗材', 'warn'); return; }
+  if (!confirm(`确认清空全部 ${data.length} 条耗材？\n数据会先存入回收站（可在回收站还原）。\n\n是否继续？`)) return;
+  pushTrash(data);
+  data = [];
+  selectedIds.clear();
+  save(); renderAll(); renderDataPage();
+  toast('已清空全部耗材，可在回收站还原', 'ok');
+}
+
+/* ── 页面渲染 ── */
+function renderDmKpis() {
+  const el = document.getElementById('dmKpis');
+  if (!el) return;
+  const rolls = data.reduce((s, d) => s + (Number(d.qty) || 0), 0);
+  const fin = data.reduce((s, d) => s + (Number(d.finished) || 0), 0);
+  const kg = data.reduce((s, d) => s + (Number(d.qty) || 0) * (Number(d.weight) || 0) / 1000, 0);
+  const brands = new Set(data.map(d => d.brand)).size;
+  const mats = new Set(data.map(d => d.material)).size;
+  const kpi = (label, val, sub, cls) => `<div class="st-kpi ${cls}">
+    <div class="st-kpi-label">${label}</div>
+    <div class="st-kpi-value">${val}</div>
+    <div class="st-kpi-sub">${sub}</div></div>`;
+  el.innerHTML =
+    kpi('库存条目', data.length, '当前记录数', 'a') +
+    kpi('库存卷数', rolls, `已用完 ${fin} 卷`, 's') +
+    kpi('库存重量', kg.toFixed(1) + '<small>kg</small>', rolls ? `单卷均重 ${Math.round(kg * 1000 / rolls)} g` : '暂无库存', '') +
+    kpi('品牌 / 材质', brands + '<small> / ' + mats + '</small>', '去重后统计', 'p') +
+    kpi('标签 / 回收站', savedTags.size + '<small> / ' + trash.length + '</small>', '标签池与待还原', 'w');
+}
+function renderDataPage() {
+  renderDmKpis();
+  renderStorageCard();
+  renderTrashCard();
+}
+
 /* ---------- 页面切换 ---------- */
 function switchPage(p) {
   closeColorPanel();                        // 切页时收起颜色面板
-  const map = { inventory:'pageInventory', swatch:'pageSwatch', stats:'pageStats' };
-  const tabMap = { inventory:'tabInventory', swatch:'tabSwatch', stats:'tabStats' };
+  const map = { inventory:'pageInventory', swatch:'pageSwatch', stats:'pageStats', data:'pageData' };
+  const tabMap = { inventory:'tabInventory', swatch:'tabSwatch', stats:'tabStats', data:'tabData' };
   Object.keys(map).forEach(k => {
     const el = document.getElementById(map[k]);
     if (!el) return;
@@ -5064,6 +5781,7 @@ function switchPage(p) {
     setSwView(swViewMode);   // 同步视图按钮态
   }
   if (p === 'stats') renderStatsPage();
+  if (p === 'data') renderDataPage();
 }
 
 /* 统计页的扇区(circle)、图例(div)、条形(div)、表格行(tr)、矩阵单元格(td)
@@ -5105,6 +5823,7 @@ MODAL_IDS.forEach(id => {
 
 /* 色卡库改为懒加载：首屏不再渲染 504 张隐藏卡片，
    等用户真正切到色卡页时再由 switchPage 触发 swInit() */
+loadTrash();     // 回收站在启动时读一次，之后由删除操作维护
 renderStatsPage();
 </script>
 </body>
