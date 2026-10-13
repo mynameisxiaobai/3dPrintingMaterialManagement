@@ -1198,7 +1198,7 @@
   .st-bar:hover { background: var(--bg-3); }
   .st-bar-name { font-size: 0.82rem; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .st-bar-track { height: 17px; background: var(--bg-3); border-radius: 5px; overflow: hidden; border: 1px solid var(--border); }
-  .st-bar-fill { height: 100%; border-radius: 4px; transition: width 0.55s cubic-bezier(0.22,1,0.36,1); min-width: 4px; }
+  .st-bar-fill { height: 100%; border-radius: 4px; transition: width 0.55s cubic-bezier(0.22,1,0.36,1); min-width: 4px; display: inline-block; vertical-align: top; }
   .st-bar-val { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-2); text-align: right; white-space: nowrap; }
   .st-bar-val i { color: var(--text-3); font-style: normal; }
 
@@ -1215,7 +1215,7 @@
   .st-table td.num, .st-table th.num { text-align: right; font-family: var(--font-mono); }
   .st-table .nm { color: var(--text-1); font-weight: 550; }
   .st-mini-track { width: 80px; height: 8px; background: var(--bg-3); border-radius: 99px; overflow: hidden; display: inline-block; vertical-align: middle; border: 1px solid var(--border); }
-  .st-mini-fill { height: 100%; border-radius: 99px; }
+  .st-mini-fill { height: 100%; border-radius: 99px; display: inline-block; vertical-align: top; }
   .st-sw { width: 18px; height: 18px; border-radius: 5px; border: 1px solid oklch(100% 0 0 / 0.2); display: inline-block; vertical-align: middle; margin-right: 7px; }
 
   /* Matrix */
@@ -2518,6 +2518,7 @@ const brandDB = [
   { canonical:'Makerbase',aliases:['makerbase','美凯'] },
   { canonical:'QIDI',aliases:['qidi','奇笛'] },
   { canonical:'Phrozen',aliases:['phrozen','光韵'] },
+  { canonical:'兰博',aliases:['兰博','lanbo','lambo','lb','lb/兰博','lb兰博','lb耗材','lanbo3d','兰博3d','兰博耗材','rambery'] },
 ];
 
 // 从任意字符串中识别品牌
@@ -2620,6 +2621,35 @@ const colorDB = {
   'peach':'#FFCBA4','apricot':'#FBCEB1','lilac':'#C8A2C8','periwinkle':'#CCCCFF','aqua':'#00FFFF',
   'jade':'#00A86B','emerald':'#50C878','ruby':'#E0115F','sapphire':'#0F52BA','amber':'#FFBF00',
   'bronze':'#CD7F32','pearl':'#F0F0F0','matteblack':'#1A1A1A','glitter':'#E8D8F0','glow':'#D9F7F5',
+  // ── 兰博 LB / LANBO 系列（慈溪市兰博打印耗材，商标 RAMBERY）──
+  // 常规单色
+  '本色':'#F2EFE6','自然色':'#F2EFE6','仿木色':'#C8A165','宝石蓝':'#0F52BA',
+  '亮黄色':'#FFE83D','亮绿色':'#3FD63F','橙黄色':'#FFA428','芒果色':'#FFA824',
+  '海军灰':'#4A5A6A','科技灰':'#8A9099','黑灰':'#3A3A3A','极光绿':'#4FE0A0','深海蓝':'#0A3D91',
+  '金属玫瑰金':'#C07C86','金属香槟金':'#E8D9B5','金属极光绿':'#4FE0A0','金属深海蓝':'#0A3D91',
+  // 丝绸彩虹（渐变多色，取主视觉代表色）
+  '丝绸彩虹冰淇淋色':'#FFC7D3','丝绸彩虹糖果色':'#F77F9F','丝绸彩虹花仙子':'#C8A2FF',
+  '丝绸彩虹番石榴':'#F49AC1','丝绸彩虹童话色':'#A8D8FF','丝绸彩虹迷你糖果':'#FF9EC4',
+  '丝绸彩虹马卡龙色':'#A8E6CF','丝绸彩虹宇宙色':'#6B5BFF','丝绸彩虹色':'#F77F9F',
+  // 哑光彩虹
+  '哑光彩虹棒棒糖':'#FF9EC4','哑光彩虹蓝红':'#6C7BFF','哑光彩虹红白':'#F8838A',
+  '哑光彩虹蓝绿':'#5FD3C4','哑光彩虹色':'#C9C4F0',
+  // 水晶彩虹
+  '水晶彩虹蓝红':'#7B8CFF','水晶彩虹蓝绿':'#4DD9C0','水晶彩虹红紫':'#E86AA6','水晶彩虹黄绿':'#D4E157',
+  // 夜光彩虹
+  '夜光彩虹':'#CFFAF0','夜光彩虹蓝':'#4DD9FF','夜光彩虹绿':'#3DFF8A','夜光彩虹粉':'#FF8ECF',
+  // 丝绸双色（金/银/红/蓝…组合）
+  '丝绸双色金银':'#D9C07A','丝绸双色金粉':'#F2B5C4','丝绸双色金红':'#D96A4A','丝绸双色金绿':'#6FBF8F',
+  '丝绸双色红蓝':'#7B6BFF','丝绸双色红黑':'#8E2F3A','丝绸双色银黑':'#9AA0A6','丝绸双色黄绿':'#C7D94F',
+  '丝绸双色黑紫':'#6B4CA8','丝绸双色蓝金':'#6C8FD9','丝绸双色蓝银':'#8FA8D9','丝绸双色深蓝深绿':'#2E6B7A',
+  // 丝绸三色
+  '丝绸三色红黄蓝':'#F26D6D','丝绸三色红蓝绿':'#5FD3C4','丝绸三色粉黄蓝':'#FFC7D3',
+  '丝绸三色黄绿紫':'#C7A8E0','丝绸三色金紫红':'#C77BA8','丝绸三色金红蓝':'#C88A5A',
+  '丝绸三色金绿玫红':'#8FD9A8','丝绸三色蓝绿橙':'#5FD3C4',
+  // 哑光双色 / 三色
+  '哑光双色蓝红':'#7B6BFF','哑光双色蓝绿':'#5FD3C4','哑光双色黄绿':'#C7D94F','哑光双色黑红':'#8E2F3A',
+  '哑光双色橙深紫':'#B85CB8','哑光双色粉绿':'#A8E6CF','哑光双色橙红':'#FF7F4D',
+  '哑光三色红黄蓝':'#F26D6D','哑光三色红蓝绿':'#5FD3C4','哑光三色粉黄蓝':'#FFC7D3',
 };
 
 // 从任意字符串中识别颜色（返回 {name, hex} 或 null）
