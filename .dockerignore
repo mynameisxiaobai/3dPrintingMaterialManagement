@@ -1,0 +1,35 @@
+# 构建上下文是项目根（compose 里 context: .），所以这个文件必须放在这里。
+# Docker 只认构建上下文根目录下的 .dockerignore。
+
+# ── 绝对不能进镜像：含明文 LAN 访问码 / 拓竹云 token / 任务历史 ──
+# 本地默认放在 data/ 下；容器里它们都走 /data 卷，镜像里一个都不该有。
+data
+printer.config.json
+bambu-cloud.json
+printer-history.json
+printer-history.json.corrupt-*
+agent-token
+app-store.json
+
+# ── 运行时产物 ──
+node_modules
+docker/data
+_p2test
+*.log
+*.tmp
+*.bak*
+*.png
+
+# ── 测试、文档、图片（镜像里不需要；要跑测试就在宿主机跑） ──
+tests
+docs
+check-*.js
+check_syntax.js
+smoke-slice.js
+*.py
+*.md
+
+# ── 无关文件 ──
+.git
+.gitignore
+.workbuddy

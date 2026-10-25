@@ -1,0 +1,23 @@
+{
+  "name": "filament-manager",
+  "version": "2.0.0",
+  "private": true,
+  "description": "3D 打印耗材管理：单文件前端 + 拓竹局域网代理 + 服务端库存存储（可容器部署）",
+  "main": "server/printer-agent.js",
+  "scripts": {
+    "start": "node server/printer-agent.js",
+    "test": "node tests/check_syntax.js && node tests/check-slice.js && node tests/check-cloud.js && node tests/check-store.js && node tests/check-inject.js && node tests/check-sync.js && node tests/smoke-slice.js && node tests/check-calib.js && node tests/check-keys.js && node tests/check-brand.js && node tests/check-report.js && node tests/check-views.js && node tests/check-match.js",
+    "bench": "node tests/bench-audit.js"
+  },
+  "dependencies": {
+    "mqtt": "5.16.1",
+    "basic-ftp": "6.2.3",
+    "fflate": "0.8.3"
+  },
+  "devDependencies": {
+    "jsdom": "30.1.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

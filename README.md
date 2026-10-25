@@ -2,7 +2,13 @@
 
 > 一个单 HTML 文件，零依赖，打开即用的 3D 打印耗材库存管理工具。
 
-![预览](https://img.shields.io/badge/单文件-HTML-blue) ![拓竹](https://img.shields.io/badge/拓竹-199种耗材-green) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+
+
+![预览](https://img.shields.io/badge/单文件-HTML-blue)
+
+![拓竹](https://img.shields.io/badge/拓竹-199种耗材-green)
+
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ---
 
@@ -17,37 +23,88 @@
 - **拓竹专属**：内置 199 种拓竹（Bambu Lab）官方耗材数据，输入编号自动识别颜色/材质
 - **标签系统**：给耗材打标签（如「常用」「哑光」「柔性」），快速分类筛选
 - **数据统计**：品牌/材质/色系/标签/规格多维度图表，支持环形图、条形图、数据表切换与 CSV 导出
+- **时间报表**：什么时候加了什么耗材（按天分组的入库时间线）、什么时候用了多少（按天/按卷的消耗明细）
 
 ---
 
 ## 功能一览
 
-| 功能 | 说明 |
-|------|------|
-| 🎨 颜色可视化 | 每种耗材显示真实色块，一眼看出颜色 |
-| 📦 库存追踪 | 记录数量、重量、是否还有料盘 |
-| 🔍 搜索筛选 | 按名称/品牌搜索，按材质/标签/库存状态筛选 |
-| 📋 网格/列表视图 | 两种视图自由切换 |
-| ⚡ 批量添加 | 一次性导入多个耗材，支持拓竹编号自动识别 |
-| 🏷️ 标签管理 | 自定义标签，支持批量打标、颜色分类 |
-| ✏️ 编辑模式 | 开启编辑模式后可直接修改卡片上的数据 |
-| 🗑️ 批量操作 | 多选后批量删除 |
-| 📊 数据统计 | 8 项 KPI + 6 个维度图表（环形/条形/表格）+ 品牌×材质交叉表 + TOP10 排行，点击图表即可跳转筛选 |
-| 📤 导出 CSV | 一键导出各维度汇总与库存明细 |
+| 功能         | 说明                                                                 |
+| ---------- | ------------------------------------------------------------------ |
+| 🎨 颜色可视化   | 每种耗材显示真实色块，一眼看出颜色                                                  |
+| 📦 库存追踪    | 记录数量、重量、是否还有料盘                                                     |
+| 🔍 搜索筛选    | 按名称/品牌搜索，按材质/标签/库存状态筛选                                             |
+| 🎨 颜色筛选    | 工具栏「颜色」色板面板，12 色系 → 具体颜色两级多选，点击即筛                                  |
+| 📋 三种视图     | 网格 / 列表 / **色系墙**（12 个色系 = 12 张卡，4 列铺满一屏；卡内直接摊开迷你卷，装不下的收成「还有 N 卷」；点卡在该行下方展开整行宽的详情面板，点卷出详情浮层；可切「迷你 / 卡片」与「紧凑 / 标准」）自由切换，可设默认 |
+| ⚡ 批量添加     | 一次性导入多个耗材，支持拓竹编号自动识别                                               |
+| 🏷️ 标签管理   | 自定义标签，支持批量打标、颜色分类                                                  |
+| ✏️ 编辑模式    | 开启编辑模式后可直接修改卡片上的数据                                                 |
+| 🗑️ 批量操作   | 多选后批量删除                                                            |
+| 📊 数据统计    | 8 项 KPI + 6 个维度图表（环形/条形/表格）+ 品牌×材质交叉表 + TOP10 排行，点击图表即可跳转筛选        |
+| 🕒 时间报表    | **入库时间线**（哪一天加了哪几卷，按天成组，含补货/移出/还原的事件流水）+ **消耗报表**（哪天用了多少 g、哪一卷最费，7/30/90 天与全部四个窗口） |
+| 💾 数据管理    | 导出 JSON 完整备份 / CSV 明细，导入 JSON·CSV（三种模式、导入前预览），回收站可还原误删，一键整理重复项与脏数据 |
+| 🖨️ 打印机联动  | 局域网自动发现拓竹打印机，实时读 AMS 每个槽的材质/颜色/余量，任务结束自动写回库存                       |
+| 🔗 自动匹配    | 槽位 ↔ 库存卷五级匹配（账本 → 槽位历史 → RFID → 材质色距），换卷自动识别可撤销，手动换绑随时可改           |
+| 📉 消耗核算    | 切片用量 / RFID 差值 / 手动校准三源互斥，不会重复记账；认不出是哪卷的用量会显式提示                    |
+| 🩺 数据体检    | 16 项只读对账（重复绑定、余量超容、切片与校准双记…），一键复制报告                                |
+| 📤 导出 CSV  | 一键导出各维度汇总与库存明细                                                     |
+
+---
+
+## 目录结构
+
+```
+filament-manager/
+├── docker-compose.yml        单容器部署入口（必须在根：context 就是 .）
+├── .dockerignore             构建上下文排除表（必须与 compose 同层）
+├── .npmrc                    npm 走 npmmirror，国内装依赖用
+├── package.json              依赖 + npm start / npm test
+├── start-printer-agent.bat   Windows 双击启动后台服务
+├── server/                   后台服务（Node）
+│   ├── printer-agent.js      入口：HTTP、静态托管、令牌鉴权
+│   ├── printer-cloud.js      拓竹云登录与任务查询
+│   ├── printer-slice.js      FTPS 取 3mf、算切片用量
+│   ├── printer-3mf.js        3mf 解析（纯函数，可单测）
+│   └── printer-store.js      服务端库存 KV（容器模式用）
+├── web/
+│   └── filament-manager.html 单文件应用：前端全部在这里
+├── tests/                    13 套自测（1053 条断言）+ 1 个性能基准
+├── docker/                   Dockerfile + 部署说明 + UGOS 自查脚本
+├── docs/                     设计说明、UI 审查报告、匹配账本说明、配图
+├── data/                     运行期状态：库存 / 配置 / 历史 / 云 token
+│                             （已被 .dockerignore 排除，不进镜像；容器里挂载为 /data）
+└── node_modules/             npm install 产物
+```
+
+**三种用法，按需要选：**
+
+| 用法      | 怎么起                                                      | 数据在哪                                   |
+| ------- | -------------------------------------------------------- | -------------------------------------- |
+| 纯前端     | 双击 `web/filament-manager.html`                           | 浏览器 `localStorage`（换机器不跟着走）           |
+| 本地服务    | `npm install` → `npm start` → 打开 `http://127.0.0.1:8787` | **`data/store/*.json`**（权威）+ localStorage 缓存 |
+| 容器（NAS） | `docker compose up -d --build`                           | **`./data/store/*.json`**（挂载项目目录）      |
+
+> 只有「打印机页」（自动搜打印机、切片用量扣减、拓竹云）需要后台服务；  
+> 库存、色卡、统计三个页签双击 HTML 就能用。
+>
+> **想让库存也存在文件里，必须跑后台服务** —— 浏览器出于安全限制不能直接读写磁盘文件。
+> 跑起来后 `data/` 目录就是唯一权威数据源，多台设备看到的是同一份库存。
 
 ---
 
 ## 快速上手
 
-### 1. 下载文件
+### 1. 打开应用
 
-直接下载 `filament-manager.html`，用浏览器打开即可。
+直接打开 `web/filament-manager.html`，或用浏览器访问本地服务：
 
 ```
 # 或者 clone 整个仓库
 git clone https://github.com/your-username/filament-manager.git
 cd filament-manager
-# 用浏览器打开 filament-manager.html
+npm install
+npm start          # 等同 node server/printer-agent.js
+# 打开 http://127.0.0.1:8787/
 ```
 
 ### 2. 添加第一条耗材
@@ -56,7 +113,8 @@ cd filament-manager
 
 - **颜色名称**：随便起个你好记的名字（如「樱花粉」）
 - **拓竹编号**（可选）：输入 5 位数字编号（如 `16103`），会自动填充官方颜色和材质
-- **品牌**：拓竹 / 其他品牌都可以
+- **品牌**：内置 41 个品牌关键词库（拓竹 / 三绿 / 兰博 / 阿米阿米 / **锐造新材** / eSUN / Polymaker …），
+  认全称、简称、拼音、英文名和店铺名；填别的品牌也行，只是不会自动联想
 - **材质**：PLA / PETG / ABS / TPU 等
 - **颜色**：手动选色，或由编号自动填充
 - **重量 / 数量 / 是否有料盘**：按实际情况填写
@@ -96,23 +154,24 @@ cd filament-manager
 
 工具内置了 **199 种**拓竹官方耗材数据，覆盖以下系列：
 
-| 系列 | 编号前缀 | 示例 |
-|------|---------|------|
-| PLA Basic | 10xxx | 10100 玉白 |
-| PLA Matte（哑光） | 11xxx | 11600 哑光海蓝 |
+| 系列            | 编号前缀  | 示例          |
+| ------------- | ----- | ----------- |
+| PLA Basic     | 10xxx | 10100 玉白    |
+| PLA Matte（哑光） | 11xxx | 11600 哑光海蓝  |
 | PLA Silk+（丝绸） | 12xxx | 12200 丝绸糖果红 |
-| PLA CF（碳纤维） | 13xxx | 13100 碳纤黑 |
-| PLA Lite | 16xxx | 16103 白色 |
-| PETG Basic | 30xxx | 30105 黑色 |
-| PETG HF（高速） | 33xxx | 33100 白色 |
-| ABS | 40xxx | 40100 白色 |
-| ASA | 42xxx | — |
-| TPU 95A HF | 51xxx | 51200 红色 |
-| PC | 65xxx | — |
-| PA6-GF | 72xxx | — |
-| … 等共 19 个系列 | | |
+| PLA CF（碳纤维）   | 13xxx | 13100 碳纤黑   |
+| PLA Lite      | 16xxx | 16103 白色    |
+| PETG Basic    | 30xxx | 30105 黑色    |
+| PETG HF（高速）   | 33xxx | 33100 白色    |
+| ABS           | 40xxx | 40100 白色    |
+| ASA           | 42xxx | —           |
+| TPU 95A HF    | 51xxx | 51200 红色    |
+| PC            | 65xxx | —           |
+| PA6-GF        | 72xxx | —           |
+| … 等共 19 个系列   |       |             |
 
 **输入格式**均支持：
+
 - 纯编号：`16103`
 - 名称+编号：`白色 16103`、`PETG黑色30105`
 
@@ -120,11 +179,19 @@ cd filament-manager
 
 ## 技术实现
 
-整个项目只有一个 HTML 文件，没有任何外部依赖框架。
+前端仍然是一个 HTML 文件（`web/filament-manager.html`），零框架、零外链、双击可用；  
+后台服务（`server/`）只在需要连打印机、多设备共享库存时才会用到，两者可以完全独立运行。
 
 ### 数据存储
 
-所有耗材数据存储在浏览器的 `localStorage`，key 为 `filaments`。每次修改都会立即持久化，刷新页面数据不会丢失。
+纯前端模式下，所有耗材数据存在浏览器 `localStorage`，key 为 `filaments`，每次修改立即持久化。
+
+> **走后台服务时（`npm start` / 容器），服务端才是权威副本**：每个数据键写成
+> `data/store/<键名>.json` 一个文件（容器里是 `/data/store/`），多台设备看到同一份库存；
+> 浏览器 localStorage 退化为缓存。纯前端模式不碰服务端，仍然只用 localStorage。
+>
+> 为什么不做成「浏览器直接读写 data/ 目录」：浏览器没有这个权限，
+> 唯一可行的路径是用 File System Access API 让用户手点授权目录，体验远差于跑一个常驻进程。
 
 ```javascript
 // 保存
@@ -192,7 +259,19 @@ function generateColor(baseHex, i, total) {
 整个 UI 通过纯 JS 动态渲染，没有使用任何前端框架：
 
 - `renderAll()` — 主渲染入口，每次数据变化时调用
-- `renderGrid()` / `renderList()` — 分别渲染网格和列表视图
+- `renderGrid()` / `renderList()` / `renderFam()` — 分别渲染网格、列表、色系视图
+  （卡片模板抽成 `filamentCardHtml()`，网格与「卡片」密度共用同一份，勾选/编辑模式/角标才不会走样；
+   `renderFam()` 渲染的是**卡片墙**：`.fam-wall` 4 列网格，每个色系一张卡，卡内用 `spoolChipHtml()`
+   渲染迷你卷，`famCap()` 按「密度 × 行档」算出每卡露几条、其余收成「还有 N 卷」；
+   点卡由 `openFamPanel()` 在该卡所在行的**下一行行首**插入整行宽的 `#famPanel`，
+   行判定用 `offsetTop`（`getBoundingClientRect` 含 transform，入场动画期间同行能差 6px），
+   **没有任何 hover 触发的展开**；顶栏「迷你 / 卡片」切 `fmFamDensity`、「紧凑 / 标准」切 `fmFamRows`，
+   两个都是设备本地偏好）
+- `openSpoolPop()` / `closeSpoolPop()` — 点迷你卷弹出的锚定详情浮层（fixed 定位、翻边、四边夹进视口）；
+  关闭时机：外部 pointerdown / Esc / 页面滚动 / `renderAll()`
+- `setView()` / `applyView()` — 切视图；`fmDefaultView` 是**设备本地**偏好，不进同步也不进备份
+- `applyTheme()` / `setTheme()` — 全局「亮 / 暗」主题，只改 `<html data-theme>`，不重渲染；
+  `fmTheme` 同样只存本地（字体仍是系统栈，零外链，断网与 NAS 内网都能开）
 - `renderStats()` — 更新顶部统计栏
 - `renderMaterialFilters()` / `renderTagFilters()` — 动态生成筛选按钮
 
@@ -200,20 +279,77 @@ function generateColor(baseHex, i, total) {
 
 ## 数据备份与迁移
 
-数据存在 `localStorage`，换浏览器/换电脑后数据不会跟着走。建议定期导出：
+数据存在 `localStorage`，换浏览器、清缓存、换电脑后数据不会跟着走。所以页面顶部有第四个标签页 **「数据管理」**，备份和恢复都在里面完成，不需要打开开发者工具。
 
-1. 打开浏览器开发者工具（F12）
-2. 在 Console 输入：
-   ```javascript
-   copy(localStorage.getItem('filaments'))
-   ```
-3. 把复制到剪贴板的 JSON 保存到文件即可备份
+**备份**：点「导出 JSON 备份」，会下载一个 `耗材库存_备份_日期.json`，包含耗材、标签池、色卡收藏三部分。换设备时在新机器上打开本工具 → 数据管理 → 拖入这个 JSON → 选「替换全部」即可。
 
-恢复时：
-```javascript
-localStorage.setItem('filaments', '【粘贴你的备份JSON】');
-location.reload();
+**导入**支持 JSON 与 CSV 两种，导入前会先列出解析结果（新增几条、重复几条），可切换三种模式：
+
+| 模式   | 行为                       |
+| ---- | ------------------------ |
+| 跳过重复 | 只导入本地没有的，已存在的保持原样        |
+| 数量累加 | 已存在的把卷数相加，适合补录同一批货       |
+| 替换全部 | 清空现有库存，完全用文件替换（旧数据先进回收站） |
+
+**误删不用慌**：删除耗材、批量删除、清理用完、清空全部，都会先放进回收站（保留最近 60 条），随时可单条还原或全部还原。
+
+> 仍然可以用开发者工具手动读写：Console 里 `copy(localStorage.getItem('filaments'))` 导出，  
+> `localStorage.setItem('filaments', '【备份JSON】')` 后刷新即可恢复。
+
+### 服务端模式：数据就是一个目录
+
+跑起后台服务后，所有数据都在项目目录的 `data/` 下，**一个键一个文件**，打开就能读：
+
 ```
+data/
+├── store/                    ← 页面里的库存 / 标签 / 匹配账本等（可整体备份）
+│   ├── _meta.json            各键版本号，不含数据本体（别手改）
+│   ├── filaments.json        库存数组  ← 最常看/改的就是它
+│   ├── savedTags.json        标签池
+│   ├── lowStockCfg.json      低库存阈值
+│   ├── prnSlotMatch.json     槽位匹配账本
+│   ├── prnTagBind.json       RFID 绑定表
+│   ├── prnCalibLog.json      校准流水
+│   └── …                     其余键同理，文件名 = 浏览器 localStorage 的 key
+├── printer.config.json      打印机列表（含明文访问码，注意权限）
+├── bambu-cloud.json         拓竹云 token（0600）
+└── printer-history.json     任务历史（切片用量原始数据）
+```
+
+`filaments.json` 的内容就是库存数组本身，没有嵌套转义：
+
+```json
+[{"id":1,"name":"哑光浅灰","brand":"锐造新材","material":"PLA","color":"#B8BAB6","weight":1000,"qty":1}]
+```
+
+| 想做的事 | 怎么做 |
+| --- | --- |
+| 备份 | 拷走整个 `data/` 目录（或只拷 `data/store/`） |
+| 搬到另一台机器 | 项目目录 + `data/` 一起拷，起服务即可 |
+| 手动改库存 | 编辑 `data/store/filaments.json` → **重启服务**（运行中改了会被下次写入覆盖） |
+| 看数据在哪 | 页面「数据管理」页有一张「数据存放位置」卡片，列出真实路径与文件清单；或 `GET /api/store?info=1` |
+| 整库导出 | `GET /api/store/export` 出一个合并的 JSON |
+
+容器里 `data/` 被挂载成 `/data`，所以宿主机上的路径就是**项目目录下的 `data/`**，
+`docker-compose.yml` 已写成 `- ./data:/data`。首次启动前必须给容器用户（uid 1000）写权限：
+
+```bash
+mkdir -p ./data && chown -R 1000:1000 ./data
+```
+
+> **从旧版本的命名卷升级**：老部署把数据放在命名卷 `fm-data` 里，不在项目目录。
+> 换成 `./data` 之后页面会显示空库 —— 先把数据掏出来，再删旧卷：
+>
+> ```bash
+> docker run --rm -v filament-manager_fm-data:/from -v "$PWD/data:/to" \
+>   alpine sh -c 'cp -av /from/. /to/'
+> docker compose up -d
+> # 确认页面数据都在之后
+> docker volume rm filament-manager_fm-data
+> ```
+>
+> 旧格式 `app-store.json`（单文件、值二次转义）会在启动时自动拆成 `store/*.json`，
+> 原文件改名成 `app-store.json.migrated-<时间戳>` 留底，不会丢数据。
 
 ---
 

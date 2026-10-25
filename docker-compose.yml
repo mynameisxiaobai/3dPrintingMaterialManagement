@@ -1,0 +1,158 @@
+# filament-manager · 单容器部署（放在项目根，默认 host 网络）
+#
+# 这个文件放在【项目根】——也就是 server/ 和 web/ 的那一层，和 docker/ 平级。
+# 启动：
+#   docker compose up -d --build
+#   浏览器打开 http://NAS_IP:18787/     （8787 在 NAS 上被别的服务占了，已换端口）
+#
+# 为什么从 docker/ 挪到根：原来的 docker/docker-compose.yml 里写 context: ..，
+# 靠「compose 文件所在目录的上一级」去找项目根。UGOS 的界面部署会把 compose
+# 存进它自己的项目目录，基准一变，.. 就指到了别处，报
+#   resolve : lstat /volume2/.../docker: no such file or directory
+# 现在 context 就是 .，只要 compose 和代码在同一层，无论目录叫什么名字都不会错。
+#
+# 只允许跑【一个】实例 —— 两个容器挂同一个卷会互相覆盖 app-store.json。
+name: filament-manager
+
+services:
+  filament-manager:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        # ── 国内加速 ──
+        # npm 走 npmmirror（默认值，一般不用改）
+        NPM_REGISTRY: https://registry.npmmirror.com
+        # 基础镜像加速站：Docker Hub 直连超时（registry-1.docker.io context deadline
+        # exceeded）时把下面这行取消注释。可用地址随时会变，先用 curl 测：
+        #   curl -sS -m 8 -o /dev/null -w "%{http_code}\n" https://docker.m.daocloud.io/v2/
+        # 401 = 通（需要认证是正常的），000/超时 = 不通
+        # NODE_IMAGE: docker.m.daocloud.io/library/node:22-alpine
+    image: filament-manager:2
+    container_name: filament-manager
+    restart: unless-stopped
+
+    # init: true 已去掉 —— Dockerfile 的 ENTRYPOINT 本身就是 /sbin/tini，
+    # 再让 compose 注入一层 init 会叠成「两层 tini」，启动时打这条警告：
+    #   Tini is not running as PID 1 and isn't registered as a child subreaper
+    # 警告无害（agent 自己处理 SIGTERM，僵尸回收由外层做），但没必要留着混淆排障。
+    # 想恢复就取消下面的注释。
+    # init: true
+
+    # ══════════════════════════════════════════════════════════════════
+    # 为什么是 host 网络：自动搜索打印机靠 SSDP 被动监听 UDP 组播
+    # 239.255.255.250:2021，而 bridge 网络下 Docker 不会把组播泛洪进容器的
+    # veth —— agent 能成功 bind 但永远收不到公告，表现为「搜到 0 台」。
+    # host 网络下容器直接用 NAS 的网卡，NAS 与打印机同网段时公告能正常收到。
+    #
+    # 代价：① 端口不再隔离，PRINTER_AGENT_PORT 的端口直接开在 NAS 上
+    #       ② 不能写 ports（host 模式下无效，compose 会报冲突）。
+    # ══════════════════════════════════════════════════════════════════
+    network_mode: host
+
+    environment:
+      TZ: Asia/Shanghai
+      # host 网络下必须绑 0.0.0.0，否则局域网里其它设备连不进来
+      PRINTER_AGENT_HOST: 0.0.0.0
+      # 8787 在 NAS 上（host 网络 = 直接用 NAS 的端口）被别的服务占了，
+      # 报错是「端口 8787 已被占用」→ 换成 18787。
+      # 再被占就往上换（28787…），先自查：ss -lntp | grep 18787
+      PRINTER_AGENT_PORT: "18787"
+      # on = 首次启动生成随机令牌存到 /data/agent-token 并注入页面，
+      #      同时不再放行任何跨源请求（挡住局域网里其它网页跨站改设备 / 内网 SSRF）。
+      # off = 老的无鉴权行为，只建议确认只有自己能访问时用。
+      # 也可以直接填一串固定令牌（既不是 on 也不是 off 时按字面值使用）。
+      FM_AUTH: "on"
+      # 告诉前端当前网络模式。host → 自动搜索可用；写成 bridge 会让页面
+      # 在搜到 0 台时提示「这是网络模式问题，不是打印机没开机」。
+      FM_NET_MODE: host
+      # 老固件兼容通道，默认 1990；只在排障时按需覆盖
+      # PRINTER_AGENT_SSDP_PORT: "2021"
+
+    # ── 健康检查 ──────────────────────────────────────────────────────
+    # 在这里显式覆盖，是为了把「端口」收敛成一件事：
+    # 镜像里的 HEALTHCHECK 虽然也读 ${PRINTER_AGENT_PORT}，但它拿到的是镜像内
+    # ENV 的默认值 8787；compose 的环境变量在运行期才注入，两者容易对不上。
+    # 不覆盖的结果是：服务其实活了、页面也能用，但 docker ps 永远显示 unhealthy，
+    # 排障时特别误导。用 $${...} 让测试命令跟着上面的环境变量走（compose 里 $$ = 字面 $），
+    # 以后再换端口只改上面一处，不用重建镜像。
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PRINTER_AGENT_PORT:-18787}/api/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+    volumes:
+      # ══════════════════════════════════════════════════════════════
+      # 数据放【项目目录】里，不再用命名卷 —— 整个目录拷走就等于搬完机器
+      # ══════════════════════════════════════════════════════════════
+      # 相对路径以 compose 文件所在目录为基准（本文件就在项目根）。
+      # 挂上之后宿主机 ./data 就是容器里的 /data，一个键一个文件：
+      #
+      #   data/store/filaments.json        库存数组（打开就能看、能改）
+      #   data/store/lowStockCfg.json      低库存阈值
+      #   data/store/prnSlotMatch.json     槽位匹配账本
+      #   data/store/prnCalibLog.json      校准流水
+      #   data/store/_meta.json            各键版本号（不含数据，别手改）
+      #   data/printer.config.json         打印机配置（含明文访问码）
+      #   data/bambu-cloud.json            拓竹云 token（0600）
+      #   data/printer-history.json        任务历史
+      #
+      # 备份 = 拷 data/；迁移 = 拷整个项目目录；改库存 = 直接编辑 filaments.json
+      # 再重启容器（agent 只在启动时读，运行中改了会被下次写入覆盖）。
+      #
+      # ── 权限（必看）──
+      # 容器以 node(uid 1000) 运行。命名卷首次挂载会继承镜像里的属主，宿主目录不会，
+      # 所以第一次必须先执行一次：
+      #   mkdir -p ./data && chown -R 1000:1000 ./data
+      # 否则报 EACCES: /data/printer.config.json.tmp，且 bambu-cloud.json(0600) 写不进去
+      # → 每次重启都要重新登录拓竹云。
+      # NAS 的 SSH 里可能没有 1000 这个用户，写数字 UID 就行（chown 接受裸数字）。
+      #
+      # ── 从旧的命名卷 fm-data 搬数据（只做一次）──
+      # 老版本用的是命名卷，数据不在项目目录里。升级后先把它掏出来：
+      #   docker run --rm -v filament-manager_fm-data:/from -v "$PWD/data:/to" \
+      #     alpine sh -c 'cp -av /from/. /to/'
+      # 页面确认数据都在之后，再删旧卷：docker volume rm filament-manager_fm-data
+      # （卷名前缀是 compose 的 name，这里是 filament-manager）
+      - ./data:/data
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ══════════════════════════════════════════════════════════════════════
+# 备选：坚持用 bridge 网络（放弃自动搜索，只能手填 IP + 序列号 + 访问码）
+# 把上面 network_mode: host 删掉，然后加上：
+#
+#     ports:
+#       - "18787:18787"
+#     environment:
+#       TZ: Asia/Shanghai
+#       PRINTER_AGENT_HOST: 0.0.0.0
+#       PRINTER_AGENT_PORT: "18787"
+#       FM_AUTH: "on"
+#       FM_NET_MODE: bridge
+# ══════════════════════════════════════════════════════════════════════
+#
+# 备选二：UGOS 界面死活改不动 context（仍然报 lstat / 找不到 Dockerfile）
+# 就用绝对路径，直接写死到你的实际目录（改这两行，其余不动）：
+#
+#     build:
+#       context: /volume2/V2Docker/Test/bambufilamentcolors
+#       dockerfile: /volume2/V2Docker/Test/bambufilamentcolors/docker/Dockerfile
+#
+# 备选三：界面完全不支持 build
+# 在本机构建后导出镜像，NAS 上「镜像 → 导入」，然后把上面 build: 整段删掉，
+# 只留 image: filament-manager:2
+# ══════════════════════════════════════════════════════════════════════
+
+# ══════════════════════════════════════════════════════════════════════
+# 原来这里声明了命名卷 fm-data。现在数据改成挂宿主目录 ./data（见 services 段），
+# 所以不要再把 fm-data 加回来 —— 加了只会让 compose 创建一个没人用的空卷，
+# 让人误以为数据又回到卷里了。老部署清理：
+#     docker volume rm filament-manager_fm-data
+# ══════════════════════════════════════════════════════════════════════
