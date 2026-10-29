@@ -16,6 +16,13 @@ try {
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
+    /* ── 吸顶栈的三个实测高度 ──
+       chrome = header 高，tabs = 页签高，gap = 页签与内容之间的呼吸位。
+       前两个是「初始值」，paintChrome() 每次布局变化后会用实测值覆盖；
+       写 60 / 44 只是为了首帧不闪。 */
+    --chrome-h: 60px;
+    --tabs-h: 44px;
+    --tabs-gap: 18px;
     --bg:        oklch(11% 0.01 240);
     --bg-1:      oklch(13% 0.011 240);   /* 此前未定义，导致标签列表 hover 背景失效 */
     --bg-2:      oklch(15% 0.012 240);
@@ -182,6 +189,18 @@ try {
     border-radius: var(--r-lg); padding: 18px 20px 16px;
     transition: border-color var(--dur-2) var(--ease-out), background-color var(--dur-2) var(--ease-out);
   }
+  /* 统计卡是下钻入口，不是装饰：看到「已用完 3」的人下一步一定是「哪 3 卷」。
+     所以它是 <button>，键盘可聚焦、可回车；hover 用强调色描边而不是加阴影，
+     因为周围已经有 5 张同尺寸的卡，阴影会让这一张单独浮起来，像被选中了。 */
+  button.stat-card {
+    display: block; width: 100%; text-align: left; font: inherit; cursor: pointer;
+    color: inherit; -webkit-appearance: none; appearance: none;
+  }
+  button.stat-card:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  button.stat-card:hover { border-color: var(--accent); background: var(--bg-3); }
+  button.stat-card:hover .stat-label { color: var(--text-2); }
   .stat-card:hover { border-color: var(--border-hi); }
   /* 标签退到元数据层（小 + 弱色 + 轻微字距），数字放大到 30px：
      一眼先看到「多少卷」，而不是先读标签。 */
@@ -206,6 +225,7 @@ try {
   .toolbar {
     display: flex; align-items: center; gap: 10px;
     margin-bottom: 20px; flex-wrap: wrap;
+    position: relative;   /* 筛选抽屉的定位基准 */
   }
 
   .search-wrap {
@@ -251,6 +271,59 @@ try {
   .filter-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
   .filter-btn.danger:disabled { opacity: 0.4; cursor: not-allowed; }
   .filter-btn.danger:disabled:hover { border-color: var(--border); color: var(--text-3); }
+
+  /* ── 筛选抽屉 ──
+     绝对定位，不参与工具栏的 flex 排版：展开时工具栏高度不变、内容不被下推。
+     展开态沿用颜色筛选那套「强调色描边 + 强调色文字」，两处入口读起来才是一套。 */
+  .fd-btn { display: inline-flex; align-items: center; gap: 6px; }
+  .fd-btn[aria-expanded="true"] {
+    background: var(--accent-dim); border-color: var(--accent); color: var(--accent);
+  }
+  .fd-btn.has-sel { border-color: var(--accent); color: var(--accent); }
+  .fd-panel {
+    position: absolute; z-index: 40;
+    left: 0; right: 0; top: calc(100% + 6px);
+    background: var(--bg-2); border: 1px solid var(--border-hi);
+    border-radius: var(--r-lg); padding: 4px 16px 12px;
+    box-shadow: 0 24px 48px -24px var(--shadow), 0 4px 12px -8px var(--shadow);
+    max-height: min(62vh, 520px); overflow-y: auto;
+  }
+  .fd-row { display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .fd-row:last-of-type { border-bottom: 0; }
+  .fd-k {
+    flex: none; width: 42px; padding-top: 6px;
+    font-size: var(--fs-micro); font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--text-3);
+  }
+  .fd-v { flex: 1; min-width: 0; }
+  .fd-v .filter-group { flex-wrap: wrap; gap: 6px; }
+  /* 抽屉里品牌一律换行：这里没有「横向还有更多」的暗示，横滑等于藏内容。
+     max-width 必须留着 —— #brandFilters 的基础规则是 nowrap + overflow-x:auto，
+     只把 overflow 改 visible 而放开 max-width，按钮会直接冲出面板右边。
+     基础规则用的是 id 选择器，flex-wrap 也得在这里显式覆盖一次。 */
+  .fd-panel #brandFilters {
+    flex-wrap: wrap; max-width: 100%; overflow: visible; padding-right: 0;
+    -webkit-mask-image: none; mask-image: none;
+  }
+  .fd-panel #brandFilters .filter-btn { flex: 0 1 auto; }
+  .fd-foot {
+    display: flex; align-items: center; gap: 12px;
+    padding-top: 12px; margin-top: 2px; border-top: 1px solid var(--border);
+  }
+  .fd-hint { font-size: 0.72rem; color: var(--text-3); flex: 1; min-width: 0; }
+  .fd-reset {
+    flex: none; background: none; border: 1px solid var(--border);
+    border-radius: var(--r-sm); padding: 5px 12px; cursor: pointer;
+    font-family: inherit; font-size: 0.76rem; color: var(--text-2);
+    transition: border-color var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
+  }
+  .fd-reset:hover { border-color: var(--border-hi); color: var(--text-1); }
+  @media (max-width: 720px) {
+    .fd-panel { left: -1px; right: -1px; padding: 2px 12px 10px; }
+    .fd-row { flex-direction: column; gap: 6px; padding: 9px 0; }
+    .fd-k { width: auto; padding-top: 0; }
+    .fd-hint { display: none; }
+  }
 
   /* ── 颜色筛选（两级浮层：色系 → 具体颜色） ── */
   .cf-wrap { position: relative; }
@@ -514,6 +587,20 @@ try {
     content: ''; position: absolute; inset: 0;
     background: linear-gradient(to bottom, transparent 40%, oklch(0% 0 0 / 0.5) 100%);
   }
+  /* ── 色块悬停洪水层（单例 canvas，见 cardFx 模块） ──
+     静止态这个节点根本不在卡片里（停在 .card-fx-host），所以纯色块与改造前逐像素一致。
+     z-index:0 落在精灵图(1)/角标(2)/操作条(4) 之下；::after 的底部渐变按树序画在它之上。
+     width/height 必须写死：canvas 是 replaced element，光靠 inset:0 撑不满，只盖左上角一块。 */
+  .card-fx {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    display: block; z-index: 0; pointer-events: none;
+  }
+  /* 停放宿主：移出视野而不是 display:none —— 不上屏的 canvas 部分浏览器会推迟合成 */
+  .card-fx-host {
+    position: fixed; left: -10000px; top: 0; width: 1px; height: 1px;
+    overflow: hidden; pointer-events: none;
+  }
   .spool-icon {
     width: 60px; height: 60px; position: relative; z-index: 1;
     filter: drop-shadow(0 2px 8px var(--shadow));
@@ -533,6 +620,11 @@ try {
   .card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .card-brand { font-size: 0.72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
   .card-material { font-size: 0.72rem; background: var(--bg-3); border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; color: var(--text-2); }
+  /* 入库日期：只在「按入库时间排序」时出现。等宽数字，纵向扫一列时位数对齐才好比大小 */
+  .card-when {
+    font-size: 0.7rem; font-family: var(--font-mono); color: var(--text-3);
+    letter-spacing: 0.01em; font-variant-numeric: tabular-nums;
+  }
 
   /* tag badges */
   .card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
@@ -659,26 +751,45 @@ try {
     font-family: inherit; white-space: nowrap;
   }
 
+  /* 卡片底栏 ── 两个真数字：库存余量（kg）与近 90 天消耗（g）。
+     原来这里是「1 ×1000g · 有料盘」：规格 ×1000g 是录入时就固定的常量，
+     重复一百遍也不产生任何决策价值；「有料盘」是默认态 —— 无料盘的卡
+     左上角本来就挂着红色角标，默认态不该再占一格说话。
+     换成两个会变的数字后，同样 40px 高度给出了「还剩多少 / 最近用掉多少」。 */
   .card-footer {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 14px; border-top: 1px solid var(--border);
+    display: flex; align-items: stretch;
+    border-top: 1px solid var(--border);
     background: var(--bg-3);
   }
-  .weight-display {
-    display: flex; align-items: baseline; gap: 3px;
+  .cf-stat {
+    flex: 1; min-width: 0;
+    display: flex; align-items: baseline; gap: 5px;
+    padding: 9px 14px;
   }
-  .weight-num { font-family: var(--font-mono); font-size: 1rem; font-weight: 700; }
-  .weight-unit { font-size: 0.7rem; color: var(--text-3); }
-  .spool-status {
-    display: flex; align-items: center; gap: 5px;
-    font-size: 0.72rem; font-weight: 500;
+  .cf-stat + .cf-stat { border-left: 1px solid var(--border); }
+  .cf-k {
+    flex: none; font-size: var(--fs-micro); color: var(--text-3);
+    letter-spacing: 0.04em;
   }
-  .spool-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: currentColor;
+  .cf-v {
+    font-family: var(--font-mono); font-size: 0.92rem; font-weight: 700;
+    color: var(--text-1); font-variant-numeric: tabular-nums; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
   }
-  .spool-yes { color: var(--success); }
-  .spool-no  { color: var(--text-3); }
+  .cf-v i { font-style: normal; font-size: 0.66rem; font-weight: 500; color: var(--text-3); margin-left: 1px; }
+  /* 没有这个数据时用弱色 —— 「—」和「0g」不是一回事 */
+  .cf-v.idle { color: var(--text-3); font-weight: 500; }
+  /* 窄屏卡片只有 ~150px 宽，两格各 75px、扣掉内边距只剩 47px：
+     「库存 0.00kg」横排一定会被省略号截掉。改成标签在上、数字在下，
+     宽度需求从 90px 降到 50px，代价只是底栏高 6px。 */
+  @media (max-width: 560px) {
+    .cf-stat {
+      flex-direction: column; align-items: flex-start; gap: 1px;
+      padding: 7px 10px;
+    }
+    .cf-k { font-size: 0.6rem; }
+    .cf-v { font-size: 0.86rem; }
+  }
 
   /* ── List view ── */
   .filament-list { display: none; flex-direction: column; gap: 4px; }
@@ -687,15 +798,20 @@ try {
   .filament-grid:not(.visible) { display: none; }
 
   /* ══════════════ 色系视图 · 色系墙（Family Wall） ══════════════
-     12 个色系 = 12 张卡片，4 列 × 3 行铺满一屏（1304px 内容宽下每张 315.5px）。
-     卡片是「色系的一格抽屉」：46px 卡头（族色轨 + 系名 + 卷数 + 折角）+ 卡内迷你卷网格。
-     卡内只放得下前 N 卷（.fam-cap 由 JS 按密度算），余下的收进「还有 N 卷」按钮。
+     每个色系是一块砖：46px 砖头（族色轨 + 系名 + 卷数）+ 砖身（迷你卷网格）。
+     **砖身永远渲染全部耗材** —— 没有截断、没有「还有 N 卷」、没有「点了才看得全」。
 
-     点卡头不跨列、不纵向撑开 —— 两种做法都会坏：
-       · grid-column:1/-1 会让非行首的卡被挤到下一行行首，卡片「飞走」、周围全重排；
-       · 纵向撑开会让同排其他 3 张卡旁边留一大片空白。
-     改由 JS 在**该卡所在行的下一行行首**插入整行宽的 #famPanel（见 openFamPanel），
-     其他卡片只被整体下推，一张都不重排。
+     排布 = JS 打包的瀑布流（见 packFamWall）：
+       · 列数按容器宽度算（1–4 列，单列下限 292px），窄屏自然降列；
+       · 每块砖先按 1 列宽量高，高宽比超上限就加宽到 2 列 —— 宽砖内格子从 2 列变 4 列，
+         高度几乎减半。于是「卷多的横着放、卷少的竖着放」不用人工配比，由内容自己决定；
+       · 落位取「当前最矮的可用列」，是经典 masonry：砖与砖之间没有空洞，
+         只有最后一排参差的底边 —— 这是瀑布流的固有形状，不是缺陷。
+
+     绝对定位的原因：CSS grid 会把同排的砖拉到同一行高，矮砖下方必留一大块空洞
+     （旧版就是靠 align-items:stretch 强行拉齐，内容少的那张卡底下全是白）。
+     没打包前 .fam-grp 仍是普通文档流，JS 算完位置才给墙加 .is-packed ——
+     脚本即使挂了也只是退化成竖排，不会叠成一坨。
 
      **本视图没有任何 hover 触发的展开**：鼠标停多久都只换描边，绝不位移、绝不动内容。
      明暗完全跟随全局主题（--bg-* / --text-* / --border），本视图不自带开关。 */
@@ -731,96 +847,119 @@ try {
   .folder-bar-btn.on { border-color: var(--border-hi); color: var(--text-1); background: var(--bg-3); }
   .fam-bar-sep { width: 1px; height: 16px; background: var(--border); margin: 0 2px; }
 
-  /* ── 卡片墙：4 列自适应，12 个色系排成 4×3 ──
-     292px 的下限让 1304px 内容宽正好落 4 列（315.5px/列）；窄屏靠媒体查询降到 2 列 / 1 列。
-     min(100%, 292px) 这层包裹必须有：容器窄于最小格宽时 minmax 会撑出横向滚动。 */
-  .fam-wall {
-    display: grid; gap: 14px; padding: 2px 0 26px;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 292px), 1fr));
-    align-items: stretch;      /* 同行等高，墙才是墙；矮卡下方留白但边框彼此对齐 */
-  }
+  /* ── 墙：坐标系由它提供，高度由 packFamWall 写 inline style ──
+     打包前砖块走普通文档流（互相往下推），所以脚本出错也只是变成一列竖排，不会重叠。 */
+  .fam-wall { position: relative; margin: 0 0 26px; }
+  .fam-wall.is-packed > .fam-grp { position: absolute; }
 
-  /* ── 单张卡：外壳是唯一的描边来源（卡头不再自带边框），否则会出现双线 ──
-     min-width:0 必须有：grid item 默认 min-width:auto，卡头里的 nowrap 文字
-     会把 1fr 轨道顶宽，撑出横向滚动条。 */
+  /* ── 一块砖：外轮廓带一层族色 ──
+     12 块砖并排时，人扫视靠的是外轮廓而不是逐块读标题；统一的中性描边
+     会让整面墙糊成一片白卡（旧版就是这样）。外壳仍是唯一描边来源，
+     砖头不自带 border，否则出现双线。
+     min-width:0 必须有：砖头里的 nowrap 文字会把宽度顶开，撑出横向滚动条。
+     宽度由 JS 按「1 列 / 2 列」写 inline，默认 100% 是给没打包时的降级用的。 */
   .fam-grp {
     --fam: #8892A0;
-    display: flex; flex-direction: column; min-width: 0;
-    background: var(--bg-2); border: 1px solid var(--border);
+    display: flex; flex-direction: column; min-width: 0; width: 100%;
+    background: var(--bg-2);
+    border: 1px solid color-mix(in oklch, var(--fam) 24%, var(--border));
     border-radius: 12px; overflow: hidden;
     transition: border-color var(--dur-2) var(--ease-out);
+    scroll-margin-top: 76px;
   }
-  /* 只有展开态染族色边。12 张卡若各有彩框会很花 —— 族色的常驻出口只有 .fam-rail。
-     混色公式与旧版 .fam-grp.open .fam-hd 一致（62% 混入 --border），保持全站色感统一。
-     align-self:start 让展开中的卡片收成一条 46px 的横条（内容已移进下方面板），
-     否则 align-items:stretch 会把它拉到同行最高，留出一大块空白边框。 */
-  .fam-grp.is-expanded {
-    border-color: color-mix(in oklch, var(--fam), var(--border) 62%);
-    align-self: start;
-  }
+  .fam-grp.is-hit { border-color: color-mix(in oklch, var(--fam) 55%, var(--border)); }
 
-  /* <h3> 只是语义标题层级，视觉全交给里面的按钮；不参与任何 transform/定位 */
-  .folder-h { margin: 0; padding: 0; font: inherit; display: block; scroll-margin-top: 76px; }
-
-  /* 卡头：卡片内部的一条 header，不再自带边框/圆角/底色（外壳负责描边）。
-     border-bottom 是卡头与内容之间的唯一分隔线。 */
+  /* ── 砖头 = 色系标牌 ──
+     族色按 11% 混进砖身底色，整条砖头就成了这一族的色卡：
+     12 块砖排在一起，头部是 12 个不同色调，扫一眼就知道哪块是哪个色系。
+     顶部再压一道 2px 族色线（inset shadow 会跟随外壳圆角弯下去，不用额外元素）。
+     高度 46 → 52：字号提到 1.02rem 后，46px 里上下只剩 6px 呼吸，读起来是「挤」。
+     它是 <h3> 而不是 <button> —— 砖身已经全员摊开了，点它没有第二层可展开；
+     做成按钮只会给键盘用户一个「按下去什么也不会发生」的假入口。
+     **没有 hover**：它不是可点元素，换底色等于在骗人。 */
   .fam-hd {
     display: flex; align-items: center; gap: 10px;
-    width: 100%; height: 46px; padding: 0 14px;
-    background: transparent; border: 0; border-bottom: 1px solid var(--border);
-    cursor: pointer; text-align: left; font-family: inherit; color: var(--text-1);
-    transition: background var(--dur-2) var(--ease-out);
+    margin: 0; width: 100%; height: 52px; padding: 0 14px;
+    background: color-mix(in oklch, var(--fam) 16%, var(--bg-2));
+    border-bottom: 1px solid color-mix(in oklch, var(--fam) 26%, var(--border));
+    box-shadow: inset 0 3px 0 var(--fam);
+    font-family: inherit; color: var(--text-1);
   }
-  /* hover 只换底色。**绝不 translateY**：这一行牵动整张卡，位移会让人以为整墙在抖。 */
-  .fam-hd:hover { background: var(--bg-3); }
-  /* outline-offset 必须为负：卡壳 overflow:hidden 会把向外扩的焦点环整圈裁掉，
-     键盘用户就完全看不到焦点了。 */
-  .fam-hd:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-  .fam-grp.is-expanded .fam-hd { background: var(--bg-3); }
 
-  /* 族色左轨：46px 卡头里只留 3px。这是本视图**唯一常驻的族色出口** ——
-     12 张卡各染一道边框会很花，折中办法就是每条只留一根色标。 */
+  /* 白色系天生没有色相：#f2f2f2 混到近乎纯白的砖身底上还是白，16% 白搭。
+     与其强行给它上色（那是在骗人，白色系就该是白的），不如换成描边表达 ——
+     顶线改用中性高级灰，砖框也加重一档，在一片米色砖头里仍能认出「这块是白的」。
+     灰系 (#9aa0a6) 不需要特例，它混出来本来就比白低一档明度。 */
+  .fam-grp[data-fam="白"] { border-color: var(--border-hi); }
+  .fam-grp[data-fam="白"] .fam-hd { box-shadow: inset 0 3px 0 var(--border-hi); }
+
+  /* 族色色标：5×26 的圆角竖条。旧版是 3×20 —— 在一条 52px 高的砖头里
+     细到几乎看不见，这是「色系不明显」最直接的原因。
+     白/灰/黑这几族本身没有色相，全靠这道内描边立住边界。 */
   .fam-rail {
-    flex: 0 0 auto; width: 3px; height: 20px; border-radius: 2px;
+    flex: 0 0 auto; width: 5px; height: 26px; border-radius: 3px;
     background: var(--fam);
-    box-shadow: inset 0 0 0 1px oklch(0% 0 0 / 0.18);
+    box-shadow: inset 0 0 0 1px oklch(0% 0 0 / 0.2),
+                0 0 0 1px oklch(0% 0 0 / 0.06);
   }
 
-  /* 系名 + 一行等宽数字。315px 的卡头只放得下「名字 + 卷数」，
-     色数与克重挪进面板头 —— 它们不是"扫一眼要认"的信息。 */
+  /* 系名：主名 1.02rem/700，「色系」二字降成小号灰字挂旁边。
+     旧版把「红色系」三字整体 0.9rem/600 且 letter-spacing 0.12em ——
+     中文字距拉开只会把标题稀释成三根散开的笔画，加上三个字同权重，
+     扫视时抓不住重点。主名与后缀分开后，眼睛先落在「红色」上。
+     窄砖（1 列 315px）里只留「名字 + 卷数」，色数与克重是宽砖才有的余量
+     —— 见下面的 [data-span="1"] 规则。 */
   .folder-name {
-    flex: 1 1 auto; min-width: 0;
-    font-size: 0.9rem; font-weight: 600; letter-spacing: 0.12em; color: var(--text-1);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 0 1 auto; min-width: 0; display: flex; align-items: baseline; gap: 5px;
+    font-size: 1.02rem; font-weight: 700; letter-spacing: 0.01em; color: var(--text-1);
+    white-space: nowrap;
   }
+  .fam-main { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .fam-suffix {
+    flex: 0 0 auto; font-style: normal;
+    font-size: 0.63rem; font-weight: 500; letter-spacing: 0.08em;
+    color: color-mix(in oklch, var(--text-3) 82%, var(--text-2));
+    transform: translateY(-1px);
+  }
+  /* 数字在染色底上要抬一档，否则 11% 族色会把它压进背景 */
   .folder-meta {
     flex: 0 0 auto; display: flex; align-items: baseline; gap: 8px;
-    font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-3);
+    font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-2);
     font-variant-numeric: tabular-nums; white-space: nowrap;
   }
-  .folder-meta b { color: var(--text-2); font-weight: 600; }
+  .folder-meta b { color: var(--text-1); font-weight: 600; }
   /* 低库存提示：族内至少一卷触发了低库存阈值（与卡片角标同一套 prnIsLow 口径） */
   .fam-low { color: var(--warn); font-weight: 600; }
 
-  /* 折角：名字占满剩余空间后，它自然被推到卡头右端 */
-  .fam-caret {
-    flex: 0 0 auto;
-    display: flex; align-items: center; justify-content: center;
-    color: var(--text-3); transition: transform var(--dur-2) var(--ease-out),
-                                            color var(--dur-2) var(--ease-out);
+  /* 实时色带：只在宽砖（2 列）出现 —— 315px 窄砖抠掉名字和数字只剩几十 px，
+     切成 1–2 段等于零信息。宽砖横向空间够，它才真正读得出「这个色系是一道什么调子」。
+     段宽按卷数自然排（1 卷 = 10px，单色封顶 400px，0 卷留 8px 小段），
+     刻意不 flex-grow 撑满：撑满后一条色带就成了进度条，压过旁边那行数字。
+     段序按色相：它是调色板，不是排行榜。 */
+  .fam-ribbon {
+    flex: 1 1 auto; min-width: 0; max-width: 420px; margin-left: auto;
+    display: flex; gap: 2px; height: 13px; overflow: hidden;
   }
-  .fam-hd[aria-expanded="true"] .fam-caret { transform: rotate(180deg); color: var(--text-2); }
-  .fam-caret svg { display: block; width: 14px; height: 14px; }
+  .fam-ribbon-seg {
+    flex: 0 0 auto; border-radius: 2px;
+    box-shadow: inset 0 0 0 1px var(--sw-ring);
+  }
+  .fam-grp[data-span="1"] .fam-ribbon,
+  .fam-grp[data-span="1"] .fam-kg { display: none; }
+  .fam-grp[data-span="1"] .folder-name { flex: 1 1 auto; }
 
-  /* ── 卡内内容：固定 2 列（315px 卡宽扣掉 padding 后每格 142.5px）。
-        刻意不用 auto-fill —— 固定列数才能让 JS 按「2 列 × N 行」精确算截断条数，
-        auto-fill 在卡宽变化时列数会飘，截断数就对不上了。 ── */
+  /* ── 砖身：格子宽度自适应 —— 窄砖 2 列、宽砖 4 列，全由容器宽度决定。
+        这也正是「加宽一张砖」能同时把它压矮的原因：JS 只决定砖宽，列数自己会跟。
+        下限 132px：315px 砖宽扣掉 10px×2 的 padding 后是 295px，正好 2 列。 ── */
   .fam-cards {
     display: grid; gap: 6px; padding: 10px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 132px), 1fr));
   }
-  /* 卡片密度：一张完整卡片自身就有 206–270px 高，卡内只排 1 列 */
-  .fam-view[data-density="card"] .fam-cards { gap: 12px; grid-template-columns: minmax(0, 1fr); }
+  /* 卡片密度：一张完整卡片自带 206–270px 高，一格起码 220px 才不会把卡片内部挤变形 */
+  .fam-view[data-density="card"] .fam-cards {
+    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  }
 
   /* ── 迷你卷：一格 = 一卷记录，只放「认得出」的四件事 ──
      颜色 / 叫什么 / 还有几卷 / 谁家的什么料。
@@ -866,13 +1005,11 @@ try {
     color: var(--text-2); font-variant-numeric: tabular-nums;
   }
 
-  /* ── 卡内紧凑变体：315px 的卡里每格只有 142.5px，双行 44px 的 chip 放不下 ──
+  /* ── 砖内紧凑变体：一列 315px 的砖里每格只有 142.5px，双行 44px 的 chip 放不下 ──
      swatch 26→18、双行 44→单行 32、隐掉「品牌·材质」（142px 内只露得出两三个字，
      纯噪音）。**只改 CSS 不改 markup**：spoolChipHtml 照旧生成 .chip-meta，
-     updateItemVisual / spoolChipClick / updateAllVisuals 全部零改动兼容；
-     面板里的 chip 不在 .fam-grp 下，自动保持 44px 双行原样。
-     32px × 4 行 + 3×gap = 146px，卡片 ≈ 218px，3 行墙 ≈ 682px ——
-     「一屏看全 12 个色系」全靠这一条，改回 44px 立刻崩（826px + 顶部 chrome 必超视口）。 */
+     updateItemVisual / spoolChipClick / updateAllVisuals 全部零改动兼容。
+     32px 一格让 12 卷只占 6 行 ≈ 190px —— 这正是不截断也能一屏看全的前提。 */
   .fam-grp .spool-chip {
     grid-template-columns: 18px minmax(0, 1fr) auto;
     grid-template-areas: "sw name qty";
@@ -896,88 +1033,19 @@ try {
     background: var(--accent); border-color: var(--accent);
   }
 
-  /* ── 「还有 N 卷」：卡内容区的收尾通栏 ──
-     它同时是「这张卡被截断了」的唯一信号，所以只在本组确实有隐藏条目时才渲染
-     （JS 保证不出现「还有 0 卷」）。N 是**卷数之和**不是记录条数 ——
-     一条记录 qty 可能是 5，用 items.length 会严重低估。 */
-  .fam-more {
-    display: block; width: 100%; height: 26px; padding: 0;
-    background: var(--bg-2); border: 0; border-top: 1px solid var(--border);
-    color: var(--text-3); font-family: var(--font-mono);
-    font-size: 0.64rem; letter-spacing: 0.06em; cursor: pointer;
-    font-variant-numeric: tabular-nums;
-    transition: color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
-  }
-  .fam-more:hover { color: var(--text-1); background: var(--bg-3); }
-  .fam-more:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-  /* 展开态里这条是冗余的：全量已经在下方 #famPanel 摊开了，卡内再写「还有 N 卷」
-     既重复也误导（点它会把面板收起来）。让卡片干净地收成一条 46px 横条。 */
-  .fam-grp.is-expanded .fam-more { display: none; }
-
-  /* ══════════════ 行内展开面板（#famPanel） ══════════════
-     点一张卡 → 在**该卡所在行的下一行行首**插入这个整行宽的面板。
-     它不跨列、不移动任何卡片：跨列会让非行首的卡被挤到下一行行首（卡片"飞走"、
-     周围全部重排），纵向撑开会让同排其他卡旁边留一大片空白。
-     插入位置由 JS 用 offsetTop 判定（见 openFamPanel），这里只管长相。 */
-  .fam-panel {
-    grid-column: 1 / -1;                    /* 占满整行 */
-    background: var(--bg-2); border: 1px solid var(--border-hi);
-    border-radius: 12px; overflow: hidden;
-    box-shadow: inset 0 1px 0 var(--sw-ring);
-  }
-  .fam-panel-hd {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    min-height: 46px; padding: 0 14px;
-    border-bottom: 1px solid var(--border); background: var(--bg-3);
-  }
-  .fam-panel-hd .folder-name { flex: 0 0 auto; font-size: 0.86rem; }
-  .fam-panel-hd .folder-meta { flex: 0 0 auto; }
-
-  /* 实时色带只在面板头出现。卡头 315px 里抠掉 rail/名字/数字/折角只剩 40–70px，
-     而色带单段固定 10–40px、最多 14 段可达 560px，必被 overflow 切成 1–2 段 ——
-     零信息量。这里横向空间充足，它才真正读得出"这个色系是一道什么调子"。
-     段序始终按色相：它是调色板，不是排行榜。宽度按卷数自然排，不 flex-grow 撑满。 */
-  .fam-ribbon {
-    flex: 1 1 auto; min-width: 0; max-width: 420px;
-    display: flex; gap: 2px; height: 13px; overflow: hidden;
-  }
-  .fam-ribbon-seg {
-    flex: 0 0 auto; border-radius: 2px;
-    box-shadow: inset 0 0 0 1px var(--sw-ring);
-  }
-  .fam-panel-btn {
-    flex: 0 0 auto; margin-left: auto;
-    height: 26px; padding: 0 12px;
-    background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r);
-    color: var(--text-2); font-family: var(--font-sans);
-    font-size: 0.68rem; font-weight: 500; letter-spacing: 0.1em; cursor: pointer;
-    transition: border-color var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
-  }
-  .fam-panel-btn:hover { border-color: var(--border-hi); color: var(--text-1); }
-  .fam-panel-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-  /* 面板内容网格：196px 起（1304px 宽下 6 列 ≈ 211px，刚好放两行文字），卡片密度 220px 起 */
-  .fam-panel .fam-cards {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 196px), 1fr));
-    gap: 8px; padding: 12px;
-  }
-  .fam-view[data-density="card"] .fam-panel .fam-cards {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
-    gap: 12px;
-  }
-  /* 面板进场只做透明度 + 2px 下沉。**不做位移动画**：面板一变高就推动下方卡片，
-     若入场还带 translateY，看起来像整面墙在往下掉。 */
-  @media (prefers-reduced-motion: no-preference) {
-    .fam-panel { animation: famPanelIn 180ms var(--ease-out); }
-  }
-  @keyframes famPanelIn {
-    from { opacity: 0; transform: translateY(-2px); }
-    to   { opacity: 1; transform: none; }
-  }
-
-  /* 减少动态：描边/底色不再过渡（本视图已无高度动画） */
+  /* 减少动态：描边/底色不再过渡（本视图已无展开动画） */
   @media (prefers-reduced-motion: reduce) {
-    .fam-rail, .fam-caret, .spool-chip, .fam-hd, .fam-grp { transition: none; }
+    .fam-rail, .spool-chip, .fam-hd, .fam-grp { transition: none; }
+  }
+
+  /* 统计页「点色系跳库存」的落点脉冲：一次族色描边，1.2s 自己消失。
+     不做位移 —— 砖的 top/left 是 JS 算死的，动它会和打包结果打架。 */
+  @media (prefers-reduced-motion: no-preference) {
+    .fam-grp.is-hit { animation: famHit 1200ms var(--ease-out); }
+  }
+  @keyframes famHit {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    20%      { box-shadow: 0 0 0 2px color-mix(in oklch, var(--fam), transparent 15%); }
   }
 
   /* 亮主题必须补的暗底文字修正（全局，网格/列表同享）：
@@ -989,17 +1057,14 @@ try {
   html[data-theme="light"] .card-action-btn.del { color: oklch(74% 0.18 27); }
   html[data-theme="light"] .card-action-btn:hover { background: oklch(22% 0.02 240 / 0.92); }
 
-  /* ── 窄屏：卡墙降列。≤700px 两列（每列 ~340px），≤460px 单列全宽 ── */
-  @media (max-width: 700px) {
-    .fam-wall { grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
-  }
+  /* ── 窄屏：列数由 packFamWall 按实际宽度算（<480 自动单列），这里只管砖内松紧 ── */
   @media (max-width: 600px) {
-    .fam-hd { gap: 9px; padding: 0 11px; height: 44px; }
+    /* 窄屏反而要 48px 而不是压到 44：这是唯一一档「一块砖占满整宽」的场景，
+       砖头的族色标牌是屏幕上唯一的色系线索，压扁了就更认不出 */
+    .fam-hd { gap: 9px; padding: 0 12px; height: 48px; }
+    .folder-name { font-size: 0.98rem; }
     .fam-bar { gap: 10px; }
     .fam-bar .fam-bar-btns { margin-left: 0; width: 100%; }
-  }
-  @media (max-width: 460px) {
-    .fam-wall { grid-template-columns: minmax(0, 1fr); }
   }
 
   /* ══════════════ 迷你卷详情浮层（锚定、非模态） ══════════════
@@ -1074,6 +1139,8 @@ try {
   .list-swatch { width: 34px; height: 34px; border-radius: 6px; flex-shrink: 0; border: 2px solid var(--sw-ring); }
   .list-name-col .list-name { font-weight: 600; font-size: 0.9rem; }
   .list-name-col .list-brand { font-size: 0.72rem; color: var(--text-3); }
+  /* 品牌后面跟入库日期（仅时间排序时），等宽数字免得逐行跳动 */
+  .list-name-col .list-when { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-3); opacity: 0.85; }
   .list-material-badge { font-size: 0.75rem; background: var(--bg-3); border: 1px solid var(--border); border-radius: 3px; padding: 2px 8px; color: var(--text-2); text-align: center; }
   .list-weight { font-family: var(--font-mono); font-size: 0.9rem; text-align: right; }
   .list-qty { font-family: var(--font-mono); font-size: 0.9rem; font-weight: 700; text-align: center; }
@@ -1219,16 +1286,47 @@ try {
     background: var(--accent-dim); border-color: var(--accent); color: var(--accent);
   }
 
-  /* Batch delete bar */
+  /* Batch delete bar ── 吸底浮条。
+     居中限宽而不是通栏：通栏要占满 1440px，五个控件散成一条空旷的横带；
+     限宽 760px 后它读起来像一张「操作卡片」。
+     两侧留 150px 是给右下角的回到顶部按钮 —— 两者同时出现时不能互相压。 */
   .batch-bar {
-    display: none; align-items: center; gap: 12px;
+    display: none;
+    position: fixed; left: 50%; bottom: 18px; z-index: 70;
+    width: min(760px, calc(100% - 150px));
+    transform: translateX(-50%);
     background: var(--bg-3); border: 1px solid var(--border-hi);
-    border-radius: var(--r); padding: 10px 16px; margin-bottom: 16px;
-    animation: fadeIn 0.2s var(--ease-out);
+    border-radius: var(--r-lg);
+    box-shadow: 0 22px 44px -20px var(--shadow), 0 2px 8px -4px var(--shadow);
   }
-  .batch-bar.visible { display: flex; }
-  .batch-bar-text { font-size: 0.88rem; color: var(--text-2); flex: 1; }
+  .batch-bar.visible { display: block; }
+  .batch-inner { display: flex; align-items: center; gap: 12px; padding: 11px 16px; }
+  .batch-all {
+    display: inline-flex; align-items: center; gap: 6px; flex: none;
+    cursor: pointer; font-size: 0.82rem; color: var(--text-2); user-select: none;
+  }
+  .batch-all input {
+    width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;
+  }
+  .batch-bar-text { font-size: 0.88rem; color: var(--text-2); }
   .batch-bar-text strong { color: var(--accent); }
+  /* 窄屏：批量条改成贴底通栏。760px 的浮条在 390px 屏上只剩 240px，
+     五个控件挤成一团，还不如让它横跨整屏、贴住安全区。 */
+  @media (max-width: 720px) {
+    .batch-bar {
+      left: 0; right: 0; bottom: 0; width: auto; transform: none;
+      border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .batch-inner { padding: 10px 14px; gap: 8px; }
+    .batch-bar-text { font-size: 0.8rem; }
+    .batch-bar .btn-batch-clear { display: none; }
+  }
+  /* 批量条浮现时把页面底部垫起来，否则最后一行永远被它压住 */
+  body.batch-on main { padding-bottom: 110px; }
+  /* 回到顶部按钮得让位：批量条浮在 bottom:18px，两者会重叠 */
+  body.batch-on .to-top { bottom: 92px; }
+
   .btn-batch-delete {
     background: var(--danger); color: #fff; border: none;
     border-radius: var(--r-sm); padding: 6px 14px; font-family: inherit;
@@ -1411,29 +1509,109 @@ try {
     background: none; border: none; border-bottom: 2px solid transparent;
     padding: 9px 15px; margin-bottom: -1px; cursor: pointer;
     font-family: inherit; font-size: 0.9rem; font-weight: 600;
-    color: var(--text-3); transition: color 0.18s var(--ease-out), border-color 0.18s var(--ease-out);
+    /* --text-3 在深色主题里是 48% 明度、压 11% 的底，对比度只有 3.4:1 ——
+       这是全站主导航，不是辅助文字。抬到 text-2（68%），两个主题都过 4.5:1。
+       hover 再抬到 text-1，层级靠 hover 和 active 的下划线区分，不靠「看不见」。 */
+    color: var(--text-2); transition: color 0.18s var(--ease-out), border-color 0.18s var(--ease-out);
   }
-  .page-tab:hover { color: var(--text-2); }
+  .page-tab:hover { color: var(--text-1); }
   .page-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
   .page { display: none; }
   .page.active { display: block; }
 
-  /* Hero */
-  .sw-hero {
-    position: relative; overflow: hidden;
-    background: var(--bg-2);
-    border: 1px solid var(--border); border-radius: var(--r-lg);
-    padding: 24px 26px; margin-bottom: 16px;
+  /* ══════════ 吸顶栈：header → 页签 → 页面工作台 ══════════
+     三个 sticky 只能一层层叠（各自 top 相加），都给 top:0 会挤在同一处。
+     --chrome-h / --tabs-h 由 paintChrome() 实测写入 —— header 在窄屏会换行，
+     写死 60px 会让页签直接盖到 header 上。--tabs-gap 是页签与内容的呼吸位，
+     用同色的 box-shadow 把这条缝填上，否则吸顶时内容会从缝里透出来。 */
+  .page-tabs {
+    position: sticky; top: var(--chrome-h); z-index: 70;
+    background: var(--bg);
+    box-shadow: 0 var(--tabs-gap) 0 var(--bg);
   }
-  /* 原来左上青、右上紫两团光晕——双色光斑是最典型的 AI 装饰。
-     现在只在左上留一团主色，且淡到几乎只是一层温度。 */
-  .sw-hero::after {
-    content: ''; position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(520px 220px at 8% -30%, oklch(72% 0.18 185 / 0.09), transparent 65%);
+
+  /* 页面工作台：统计卡 / 工具栏 / 搜索框冻在页签下面。
+     不透明底是硬要求：吸顶后下方内容从它背后滚过。 */
+  .pinned {
+    position: sticky;
+    top: calc(var(--chrome-h) + var(--tabs-h) + var(--tabs-gap));
+    z-index: 60;
+    background: var(--bg);
+    padding-bottom: 2px;
+    transition: box-shadow var(--dur-2) var(--ease-out);
   }
-  .sw-hero-title { position: relative; font-size: 1.45rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 6px; }
-  .sw-hero-sub { position: relative; color: var(--text-2); font-size: 0.87rem; max-width: 76ch; line-height: 1.6; }
-  .sw-stats { position: relative; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
+  /* 只有真吸住了才需要分层线；没吸顶时画一条会像凭空多出的分隔线。
+     影 + 内嵌发丝线：暗色下纯投影是黑压黑，等于没画，发丝线两种主题都看得见。 */
+  .pinned.is-stuck {
+    box-shadow: 0 14px 18px -18px var(--shadow), inset 0 -1px 0 var(--border);
+  }
+  .pinned .stats-bar { margin-bottom: 16px; }
+  .pinned .toolbar { margin-bottom: 12px; }
+
+  /* 窄屏不冻工作台：手机 header 换行后已经吃掉 110px，再叠统计卡 + 工具栏
+     就只剩半屏看内容了。页签继续吸顶 —— 切页是随时要用的。 */
+  @media (max-width: 900px) {
+    .pinned { position: static; }
+    .pinned.is-stuck { box-shadow: none; }
+  }
+
+  /* ── 紧凑态：滚动超过 120px 后统计卡压成一行胶囊 ──
+     从 5 张 96px 的卡变成 5 个 34px 的胶囊，把 62px 还给内容。
+     标签不删只缩：删了「27」就不知道是几卷还是几克。
+     只在桌面生效 —— 窄屏本来就不吸顶（见 900px 断点），压缩过去没人受益。 */
+  @media (min-width: 901px) {
+    /* 网格换成紧贴内容的横排：auto-fit 会把 5 个胶囊拉满整行，
+       每个变成一条 190px 的空框，标签和数字分在两头，读起来像表单而不是读数字。 */
+    .pinned.is-tight .stats-bar {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;
+    }
+    .pinned.is-tight .stat-card {
+      /* width:auto 是必须的：正常态下 button.stat-card 用 width:100% 撑满 grid 格子，
+         带进 flex 行里就成了「每张卡占满一行」，5 张卡叠成 191px。 */
+      flex: 0 1 auto; width: auto;
+      display: flex; align-items: baseline; gap: 7px;
+      padding: 7px 12px; border-radius: var(--r);
+    }
+    .pinned.is-tight .stat-label {
+      margin: 0; font-size: 0.61rem; letter-spacing: 0.04em;
+      text-transform: none;  /* 小字再全大写就成噪音了 */
+    }
+    .pinned.is-tight .stat-value { font-size: 0.96rem; }
+  }
+
+  /* ── 回到顶部 ──
+     固定在右下，避开顶部可滚动区。hidden 用 visibility 而非 display：
+     display 会让它在获得焦点时突然跳出来，visibility 不会（也不进 tab 序）。 */
+  .to-top {
+    position: fixed; right: clamp(14px, 2.4vw, 26px); bottom: clamp(14px, 2.4vw, 26px);
+    z-index: 120;
+    width: 42px; height: 42px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--bg-2); color: var(--text-2);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 20px -10px oklch(0% 0 0 / 0.5);
+    cursor: pointer;
+    opacity: 0; visibility: hidden;
+    transform: translateY(10px) scale(0.94);
+    transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out),
+                visibility var(--dur-2) var(--ease-out),
+                border-color var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
+  }
+  .to-top.show { opacity: 1; visibility: visible; transform: none; }
+  .to-top:hover { border-color: var(--border-hi); color: var(--text-1); }
+  /* 暗色下 --bg-2 与 --bg 只差 4% 明度，按钮会整个糊进背景 —— 抬到 bg-3 + 亮描边 */
+  [data-theme="dark"] .to-top { background: var(--bg-3); border-color: var(--border-hi); color: var(--text-1); }
+  [data-theme="dark"] .to-top:hover { border-color: var(--text-3); }
+  .to-top:active { transform: scale(0.96); }
+  @media (prefers-reduced-motion: reduce) {
+    .to-top { transition: none; }
+    .to-top:active { transform: none; }
+  }
+
+  /* Hero —— 与 .st-hero 共用（统计 / 数据管理 / 打印机页）。这里只留色卡统计胶囊。
+     以前有一条独立的 .sw-hero：1.45rem 标题 + 76ch 副标 + 24px 内边距，
+     与其它三页的 1.12rem / 660px / 20px 对不上，切页时整套字号在跳。 */
+  .sw-stats { position: relative; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
   .sw-stat {
     display: inline-flex; align-items: baseline; gap: 6px;
     padding: 5px 12px; border-radius: 999px;
@@ -1441,6 +1619,46 @@ try {
     font-size: 0.74rem; color: var(--text-3);
   }
   .sw-stat b { font-family: var(--font-mono); font-size: 0.95rem; color: var(--text-1); font-weight: 700; }
+
+  /* ── 色卡分组 ──
+     692 张卡平铺 = 30227px，滚到中部满屏都是绿色卡片，完全不知道自己走到哪。
+     按色系切组，组标题吸在吸顶工作台下面，滚动时始终有一行「绿系 · 86」在报位置。 */
+  .sw-groups { display: block; }
+  .sw-group { position: relative; }
+  .sw-group + .sw-group { margin-top: 8px; }
+  .sw-group-hd {
+    /* --pinned-h 由 paintPinnedH() 实测写入：色卡库的吸顶工作台高度会随
+       「已选筛选」胶囊条出现而变，写死一个 46px 会露出底下滚过去的卡片。 */
+    position: sticky;
+    top: calc(var(--chrome-h) + var(--tabs-h) + var(--tabs-gap) + var(--pinned-h, 0px));
+    z-index: 30;
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 2px 8px; margin-bottom: 12px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  /* hero 是白色说明卡，组标题要是浮在上面会露边 —— 只在真吸住时加一条底线即可，
+     这里不做 is-stuck 检测（每滚一像素算 12 个元素的位置，不值当）。 */
+  .sw-group-dot {
+    width: 11px; height: 11px; border-radius: 4px; flex: none;
+    border: 1px solid var(--sw-ring);
+  }
+  .sw-group-name { font-size: 0.94rem; font-weight: 700; color: var(--text-1); letter-spacing: 0.01em; }
+  .sw-group-n {
+    font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600;
+    color: var(--text-3); padding: 1px 7px; border-radius: 999px;
+    background: var(--bg-3); border: 1px solid var(--border);
+  }
+  .sw-group-sp { flex: 1; }
+  .sw-group-more {
+    font-family: inherit; font-size: 0.75rem; font-weight: 600;
+    color: var(--accent); background: none; border: 1px solid transparent;
+    padding: 4px 10px; border-radius: 999px; cursor: pointer;
+    transition: background var(--dur-1) var(--ease-out);
+  }
+  .sw-group-more:hover { background: var(--accent-dim); }
+  /* 第一个组标题不要贴着「共 692 个颜色」那一行 */
+  .sw-group:first-child .sw-group-hd { margin-top: 2px; }
 
   /* Toolbar */
   .sw-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 2px 0 10px; }
@@ -1622,10 +1840,12 @@ try {
   .sw-block { width: 100%; height: 38px; }
 
   /* 品牌名录 */
-  .sw-brands { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); }
-  .sw-brands-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-  .sw-brands-head h3 { font-size: 1rem; font-weight: 650; }
-  .sw-brands-hint { font-size: 0.75rem; color: var(--text-3); }
+  /* 品牌名录弹层（入口在 hero 右上角）。原来这块是页面最底部的常驻区块，
+     41 个品牌 7 行 ≈ 400px，位置在 692 张色卡之后 —— 等于永不打开。 */
+  .sw-modal-panel.wide { width: min(720px, 100%); }
+  .sw-brand-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; padding-right: 40px; }
+  .sw-brand-head h3 { font-size: 1.02rem; font-weight: 700; color: var(--text-1); }
+  .sw-brand-head span { font-size: 0.75rem; color: var(--text-3); }
   .sw-brand-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 8px; }
   .sw-brand {
     background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r);
@@ -1748,6 +1968,9 @@ try {
     padding: 12px 16px; margin-bottom: 16px;
   }
   .st-ctrl-item { display: flex; align-items: center; gap: 8px; }
+  /* 吸顶时这条 16px 会跟着一起冻在屏幕上，白占一截 —— 交给 .pinned 的 padding 统一管 */
+  #stPinned { padding-bottom: 10px; }
+  #stPinned .st-ctrl { margin-bottom: 0; }
   .st-ctrl-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-3); white-space: nowrap; }
   .st-ctrl-spacer { flex: 1; }
   .st-meta { font-size: 0.78rem; color: var(--text-3); }
@@ -1763,16 +1986,27 @@ try {
   .st-seg button.active { background: var(--accent-dim); color: var(--accent); }
   .st-seg.mini button { padding: 4px 9px; font-size: 0.72rem; }
 
-  .st-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(142px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .st-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
   .st-kpi {
-    background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r-lg);
-    padding: 14px 16px; transition: border-color 0.2s var(--ease-out), transform 0.2s var(--ease-out);
+    position: relative;
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r);
+    padding: 11px 14px 12px; transition: border-color 0.2s var(--ease-out), transform 0.2s var(--ease-out);
   }
   .st-kpi:hover { border-color: var(--border-hi); transform: translateY(-2px); }
-  .st-kpi-label { font-size: 0.69rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-3); margin-bottom: 6px; }
-  .st-kpi-value { font-family: var(--font-mono); font-size: 1.4rem; font-weight: 700; color: var(--text-1); line-height: 1.15; }
+  .st-kpi-label { font-size: 0.7rem; letter-spacing: 0.02em; color: var(--text-2); margin-bottom: 5px; }
+  .st-kpi-value { font-family: var(--font-mono); font-size: 1.4rem; font-weight: 700; color: var(--text-1); line-height: 1.12; }
   .st-kpi-value small { font-size: 0.72rem; color: var(--text-3); font-weight: 400; margin-left: 3px; }
-  .st-kpi-sub { font-size: 0.72rem; color: var(--text-3); margin-top: 5px; }
+  /* 副标是「最多：polymaker 9卷」这类最有用的信息，原来 0.72rem / --text-3 在 153px 里
+     既小又淡，等于没写。抬字号、抬一档色阶，长名字省略但 title 里有全文。 */
+  .st-kpi-sub {
+    font-size: 0.75rem; color: var(--text-2); margin-top: 5px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* 主次：只有「当前口径合计」（切到含已用完 / 仅已用完时才出现）在左侧挂一条 accent 竖线 */
+  .st-kpi.a::before {
+    content: ''; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px;
+    border-radius: 0 3px 3px 0; background: var(--accent);
+  }
   .st-kpi.a .st-kpi-value { color: var(--accent); }
   .st-kpi.s .st-kpi-value { color: var(--success); }
   .st-kpi.w .st-kpi-value { color: var(--warn); }
@@ -1781,6 +2015,19 @@ try {
 
   /* min() 兜底：容器窄于 420px 时列宽跟随容器，不再被固定下限撑破 */
   .st-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 16px; align-items: start; }
+
+  /* ── 数据管理页：两栏纵向堆叠（刻意不用 .st-cards 的 grid） ──
+     这个页面的卡片高度差极大：存储占用有 15 行 kv（≈600px），导出只有 4 个按钮（≈190px）。
+     grid 一行的行高由该行最高的那张决定，于是矮卡下方会空出 300px 以上的白洞
+     （截图里那块空白就是它），而「整理与修复」还会单独占掉一整行的另两格。
+     改成两栏各自纵向堆叠后，栏内卡片首尾相接，内部永远没有空洞，
+     代价只是两栏底边参差 —— 流式排布的固有限度，观感上是正常的。
+     分工：左栏「会动手做的事」，右栏「当下是什么状态」。 */
+  .dm-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .dm-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  /* 回收站要整行宽（列表 + 两个操作按钮），所以它在两栏之外 */
+  .dm-trash { margin-top: 16px; }
+  @media (max-width: 980px) { .dm-cols { grid-template-columns: 1fr; } }
   .st-card {
     background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r-lg);
     padding: 16px 18px 18px; display: flex; flex-direction: column;
@@ -1796,6 +2043,15 @@ try {
   .st-card-title { font-size: var(--fs-lead); font-weight: 650; letter-spacing: -0.01em; }
   .st-card-sub { font-size: 0.75rem; color: var(--text-3); margin-top: 3px; line-height: 1.45; }
   .st-card-tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  /* 390px 下「标题 + 右侧按钮」会把标题压成一条 86px 宽的窄柱（一行两三个字）。
+     光给容器加 wrap 没用 —— 标题和 spacer 都是 flex:1，容器会先把它们压缩到极限，
+     永远轮不到换行。必须让标题的 basis 直接吃掉整行，按钮才掉得下去。 */
+  @media (max-width: 560px) {
+    .st-card-head { flex-wrap: wrap; row-gap: 8px; }
+    .st-card-head > .st-card-t { flex: 1 1 calc(100% - 40px); }
+    .st-card-head > .spacer { display: none; }
+    .st-card-head > .st-btn, .st-card-head > .st-card-tools { margin-left: auto; }
+  }
 
   /* Donut */
   .st-split { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
@@ -1847,7 +2103,7 @@ try {
     text-align: left; font-size: 0.69rem; text-transform: uppercase; letter-spacing: 0.08em;
     color: var(--text-3); font-weight: 600; padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap;
   }
-  .st-table td { padding: 6px 8px; border-bottom: 1px solid oklch(24% 0.012 240); color: var(--text-2); vertical-align: middle; }
+  .st-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); color: var(--text-2); vertical-align: middle; }
   .st-table tbody tr { cursor: pointer; transition: background 0.14s var(--ease-out); }
   .st-table tbody tr:hover { background: var(--bg-3); }
   .st-table td.num, .st-table th.num { text-align: right; font-family: var(--font-mono); }
@@ -2120,6 +2376,25 @@ try {
   .prn-agent-flag { font-size: 0.72rem; font-family: var(--font-mono); padding: 4px 10px; border-radius: 99px; border: 1px solid var(--border); color: var(--text-3); }
   .prn-agent-flag.on { color: var(--success); border-color: var(--success); }
   .prn-agent-flag.off { color: var(--danger); border-color: var(--danger); }
+  /* 离线态的能力清单：替代 4 张空卡，一屏说完「这里将有什么」 */
+  .prn-off-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 4px 20px; margin-top: 6px; }
+  .prn-off-item {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 7px 12px; border-left: 2px solid var(--border);
+  }
+  .prn-off-item b { font-size: 0.82rem; color: var(--text-1); font-weight: 650; }
+  .prn-off-item span { font-size: 0.75rem; color: var(--text-3); line-height: 1.5; }
+  /* 分区标题：11 张卡平铺时没有层级，光靠 16px 的间距分不出「设备」和「流水」。
+     横线吃掉剩余宽度，让标题成为一条可扫读的分界。 */
+  .prn-sec {
+    display: flex; align-items: center; gap: 12px;
+    margin: 24px 0 12px; font-size: 0.78rem; font-weight: 700;
+    letter-spacing: 0.03em; color: var(--text-2);
+  }
+  .prn-sec:first-child { margin-top: 0; }
+  .prn-sec::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  /* 卡片间距统一在这一层，不再每张卡手写 style="margin-top:16px" */
+  #prnOnlineArea > .st-card, #prnDataArea > .st-card { margin-top: 16px; }
   .prn-url-input { background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--r); padding: 8px 10px; color: var(--text-1); font-family: var(--font-mono); font-size: 0.82rem; outline: none; min-width: 220px; }
   .prn-field { display: flex; flex-direction: column; gap: 5px; }
   .prn-field label { font-size: 0.72rem; color: var(--text-3); }
@@ -2154,8 +2429,8 @@ try {
     transition: background var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out); }
   .prn-exhaust-btn:hover { background: oklch(from var(--danger) l c h / 0.2); }
   .prn-exhaust-btn:active { transform: scale(0.97); }
-  /* 每卷近期消耗（按 RFID 归属，近 90 天估算） */
-  .card-usage { font-size: 0.65rem; color: var(--accent); font-family: var(--font-mono); background: var(--accent-dim); padding: 1px 5px; border-radius: 3px; }
+  /* 每卷近期消耗（按 RFID 归属，近 90 天估算）。
+     卡片上的用量已经挪进底栏（.cf-stat），这里只剩列表视图用的 .list-usage。 */
   .list-usage { font-size: 0.68rem; font-family: var(--font-mono); color: var(--accent); margin-left: 5px; }
 
   /* ── 拓竹云 · 切片用量（第三方无 RFID 料盘的唯一精确口径） ── */
@@ -2188,16 +2463,36 @@ try {
   .prn-slice-warn { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; padding: 8px 10px; border: 1px solid var(--warn, var(--border-hi)); border-radius: var(--r); font-size: 0.76rem; color: var(--text-2); background: color-mix(in oklab, var(--warn, #d8a13a) 8%, transparent); }
   .prn-slice-warn .spacer { flex: 1 1 auto; }
 
-  /* Matrix */
+  /* Matrix
+     4 个品牌 × 4 个材质时，34 个格子里只有 5 个有数 —— 满格线 + 一堆「–」
+     读起来就是一张 Excel 空表。改成「有值才有块」：格子不画边框，有值的染成
+     accent 深浅方块（--heat 由 JS 按数值比例写入），空格什么都不画。
+     同一份数据从「表格」变成「点阵」，稀疏时反而更容易看出分布在哪。 */
   .st-mx-wrap { overflow-x: auto; }
-  .st-mx { border-collapse: collapse; font-size: 0.8rem; min-width: 100%; }
-  .st-mx th, .st-mx td { border: 1px solid var(--border); padding: 7px 11px; text-align: center; white-space: nowrap; }
-  .st-mx thead th { background: var(--bg-3); color: var(--text-2); font-weight: 600; font-size: 0.75rem; }
-  .st-mx tbody th { background: var(--bg-3); color: var(--text-1); font-weight: 600; text-align: left; position: sticky; left: 0; }
-  .st-mx .cell { font-family: var(--font-mono); color: var(--text-1); cursor: pointer; transition: box-shadow 0.12s var(--ease-out); }
+  .st-mx { border-collapse: separate; border-spacing: 3px; font-size: 0.8rem; min-width: 100%; }
+  .st-mx th, .st-mx td { padding: 6px 10px; text-align: center; white-space: nowrap; }
+  .st-mx thead th { color: var(--text-2); font-weight: 600; font-size: 0.75rem; border-bottom: 1px solid var(--border); }
+  .st-mx tbody th {
+    color: var(--text-1); font-weight: 600; text-align: left;
+    position: sticky; left: 0; background: var(--bg-2); border-bottom: 1px solid var(--border);
+  }
+  .st-mx .cell {
+    font-family: var(--font-mono); color: var(--text-1); cursor: pointer;
+    border-radius: var(--r-sm); min-width: 46px;
+    transition: box-shadow 0.12s var(--ease-out), background 0.12s var(--ease-out);
+  }
+  /* 有值：accent 深浅块。文字始终压在最上层，热度再深也不影响读数。 */
+  .st-mx .cell.has { background: color-mix(in oklch, var(--accent) var(--heat, 30%), transparent); }
+  [data-theme="dark"] .st-mx .cell.has { background: color-mix(in oklch, var(--accent) var(--heat-d, 12%), transparent); }
   .st-mx .cell:hover { box-shadow: inset 0 0 0 2px var(--accent); }
-  .st-mx .cell.zero { color: var(--text-3); opacity: 0.45; }
-  .st-mx tfoot th, .st-mx tfoot td { background: var(--bg-3); font-weight: 700; color: var(--text-1); font-family: var(--font-mono); }
+  /* 零值：留白，不画「–」。空格本身就是「这里没有」，画个减号等于每格都喊一次 */
+  .st-mx .cell.zero { cursor: default; }
+  .st-mx .cell.zero:hover { box-shadow: none; }
+  .st-mx .tot { font-weight: 700; color: var(--text-1); font-family: var(--font-mono); }
+  .st-mx tfoot th, .st-mx tfoot td {
+    font-weight: 700; color: var(--text-1); font-family: var(--font-mono);
+    border-top: 1px solid var(--border);
+  }
 
   /* 说明文字经常承载关键事实（为什么读不到余量、差值怎么记账），
      10.8px + 48% 灰在暗背景上读起来很累，抬到 11.7px / 68% 灰 */
@@ -2217,6 +2512,9 @@ try {
 
   /* ══════════════ 数据管理页 ══════════════ */
   .st-card.danger { border-color: oklch(from var(--danger) l c h / 0.4); }
+  /* 从两栏里提出来之后要和上面那栏拉开距离；回收站紧跟着它（同为删除相关） */
+  .dm-danger { margin-top: 16px; }
+  .dm-danger .dm-acts { margin-top: 2px; }
   .dm-acts { display: flex; gap: 8px; flex-wrap: wrap; }
   .dm-note { font-size: 0.72rem; color: var(--text-3); line-height: 1.65; margin-top: 10px; }
   .dm-note b { color: var(--text-2); font-weight: 600; }
@@ -2264,8 +2562,17 @@ try {
   .dm-meter { height: 9px; background: var(--bg-3); border: 1px solid var(--border); border-radius: 99px; overflow: hidden; margin: 10px 0 8px; }
   /* 单色填充：数字本身在下面写着，渐变只会让「用了多少」更难判断 */
   .dm-meter-fill { height: 100%; border-radius: 99px; background: var(--accent); transition: width 0.4s var(--ease-out); }
-  .dm-kv { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.78rem; padding: 5px 0; border-bottom: 1px solid oklch(24% 0.012 240); }
+  /* 硬编码的暗色线在浅色主题下会是一条深灰 —— 存储明细每行都画一根 */
+  .dm-kv { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.78rem; padding: 5px 0; border-bottom: 1px solid var(--border); }
   .dm-kv:last-child { border-bottom: none; }
+  /* 折叠条：把「其余 15 项 0 B」收成一行，要点开才看 */
+  .dm-more {
+    display: inline-flex; align-items: center; gap: 5px; margin-top: 6px;
+    background: none; border: none; padding: 4px 0; cursor: pointer;
+    font-family: inherit; font-size: 0.75rem; font-weight: 600; color: var(--text-2);
+  }
+  .dm-more:hover { color: var(--text-1); }
+  .dm-empty-list { margin-top: 2px; opacity: 0.7; }
   .dm-kv span { color: var(--text-3); }
   .dm-kv b { font-family: var(--font-mono); color: var(--text-1); font-weight: 600; }
 
@@ -2381,65 +2688,54 @@ try {
   <!-- ══════════ 页面：耗材库存 ══════════ -->
   <div class="page active" id="pageInventory">
 
+  <!-- ── 吸顶工作台 ──
+       统计卡 + 批量条 + 工具栏一起冻结在页签下面：翻到列表第 80 行时还能改筛选，
+       不用先滚回顶部。滚动超过 120px 由 paintPinned() 切成紧凑态（统计卡压成一行胶囊），
+       否则这一坨会吃掉小屏一半的高度。 -->
+  <div class="pinned" id="invPinned">
+
   <!-- Stats -->
   <div class="stats-bar" id="statsBar"></div>
 
-  <!-- Batch bar -->
-  <div class="batch-bar" id="batchBar">
-    <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:0.82rem;color:var(--text-2);user-select:none">
-      <input type="checkbox" id="batchSelectAll" onclick="toggleSelectAll()" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer"> 全选
-    </label>
-    <span class="batch-bar-text" style="margin-left:8px">已选中 <strong id="selectedCount">0</strong> 条</span>
-    <span style="flex:1"></span>
-    <button class="btn-batch-clear" onclick="clearSelection()">取消选择</button>
-    <button class="btn-batch-edit" id="batchEditBtn" onclick="openBatchEditModal()" disabled>批量编辑</button>
-    <button class="btn-batch-delete" id="batchDeleteBtn" onclick="batchDelete()" disabled>批量删除</button>
-  </div>
-
-  <!-- Toolbar -->
-  <div class="toolbar">
+  <!-- Toolbar ── 只留一行高频项：搜索 / 库存状态 / 颜色 / 视图。
+       品牌、材质、标签、排序、AMS、消耗记录一共 6 组 20 多个按钮，
+       全铺在吸顶区里要占两整行、把砖墙顶到屏幕下半部分。
+       现在它们收进「筛选」抽屉 —— 绝对定位的下拉层，展开时不推动内容、
+       也不改变吸顶区高度（抽屉开着也能滚，滚的时候跟着工作台一起走）。 -->
+  <div class="toolbar" id="invToolbar">
     <div class="search-wrap">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input class="search-input" id="searchInput" placeholder="搜索耗材名称、品牌…" oninput="onSearchInput()" onkeydown="if(event.key==='Escape'){this.value='';flushSearch();}">
     </div>
 
-    <div class="filter-group" id="brandFilters"></div>
-    <div class="filter-group" id="materialFilters"></div>
-    <div class="filter-group" id="tagFilters"></div>
-
     <div class="filter-group">
-      <div class="cf-wrap" id="colorFilterWrap">
-        <button class="filter-btn cf-btn" id="colorFilterBtn" onclick="toggleColorPanel()"
-                aria-expanded="false" aria-haspopup="true" title="按颜色筛选耗材">
-          <span class="cf-dots" id="colorFilterDots"></span>
-          <span>颜色</span>
-          <span class="cf-val" id="colorFilterVal">全部</span>
-          <span class="cf-badge" id="colorFilterCount" hidden>0</span>
-          <svg class="cf-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </button>
-        <div class="cf-panel" id="colorFilterPanel" role="group" aria-label="按颜色筛选" hidden></div>
-      </div>
+      <button class="filter-btn idle" id="filterAll" onclick="setStatusFilter('all')" title="不限库存状态">全部</button>
+      <button class="filter-btn" id="filterInStock" onclick="setStatusFilter('instock')" title="至少还有一卷">有库存</button>
+      <button class="filter-btn" id="filterNoSpool" onclick="setStatusFilter('nospool')" title="没装料盘（不能直接上机）">无料盘</button>
+      <button class="filter-btn" id="filterFinished" onclick="setStatusFilter('finished')" title="数量为 0 的记录">已用完</button>
     </div>
 
-    <div class="filter-group">
-      <button class="filter-btn idle" id="sortDefaultBtn" onclick="setSortMode('default')" title="按录入顺序排列">默认</button>
-      <button class="filter-btn" id="sortUsageBtn" onclick="setSortMode('usage')" title="按近 90 天打印消耗从高到低排列（依赖打印机同步）">消耗高→低</button>
+    <div class="cf-wrap" id="colorFilterWrap">
+      <button class="filter-btn cf-btn" id="colorFilterBtn" onclick="toggleColorPanel()"
+              aria-expanded="false" aria-haspopup="true" title="按颜色筛选耗材">
+        <span class="cf-dots" id="colorFilterDots"></span>
+        <span>颜色</span>
+        <span class="cf-val" id="colorFilterVal">全部</span>
+        <span class="cf-badge" id="colorFilterCount" hidden>0</span>
+        <svg class="cf-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="cf-panel" id="colorFilterPanel" role="group" aria-label="按颜色筛选" hidden></div>
     </div>
 
-    <div class="filter-group">
-      <button class="filter-btn" id="filterAmsBtn" onclick="toggleAmsFilter()" title="只显示已绑定到打印机 AMS 槽位的卷">AMS 在用</button>
-      <button class="filter-btn" id="filterUsageBtn" onclick="toggleUsedFilter()" title="只显示近 90 天有打印消耗记录的卷（依赖打印机同步）">有消耗记录</button>
-    </div>
+    <button class="filter-btn fd-btn" id="moreFilterBtn" onclick="toggleFilterDrawer()"
+            aria-expanded="false" aria-haspopup="true" aria-controls="filterDrawer" title="品牌 / 材质 / 标签 / 排序 / 范围">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
+      <span>筛选</span>
+      <span class="cf-badge" id="moreFilterCount" hidden>0</span>
+      <svg class="cf-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
 
     <div class="spacer"></div>
-
-    <div class="filter-group">
-      <button class="filter-btn idle" id="filterAll" onclick="setStatusFilter('all')">全部</button>
-      <button class="filter-btn" id="filterInStock" onclick="setStatusFilter('instock')">有库存</button>
-      <button class="filter-btn" id="filterNoSpool" onclick="setStatusFilter('nospool')">无料盘</button>
-      <button class="filter-btn" id="filterFinished" onclick="setStatusFilter('finished')">已用完</button>
-      <button class="filter-btn danger" id="clearFinishedBtn" onclick="clearFinished()" title="删除所有已用完的耗材记录">清理用完</button>
-    </div>
 
     <div class="view-toggle">
       <button class="view-btn" id="viewGrid" onclick="setView('grid')" title="网格视图" aria-pressed="false">
@@ -2452,6 +2748,46 @@ try {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h11"/><path d="M3 12h11"/><path d="M3 18h11"/><path d="M18 9l3 3-3 3"/></svg>
       </button>
     </div>
+
+    <!-- 筛选抽屉：左上角对齐工具栏，宽度跟着工具栏走。
+         每行「标签 + 内容」，内容自己换行 —— 品牌可能有十几个，横滑在抽屉里没法用。 -->
+    <div class="fd-panel" id="filterDrawer" hidden>
+      <div class="fd-row">
+        <div class="fd-k">品牌</div>
+        <div class="fd-v"><div class="filter-group" id="brandFilters"></div></div>
+      </div>
+      <div class="fd-row">
+        <div class="fd-k">材质</div>
+        <div class="fd-v"><div class="filter-group" id="materialFilters"></div></div>
+      </div>
+      <div class="fd-row" id="fdTagRow">
+        <div class="fd-k">标签</div>
+        <div class="fd-v"><div class="filter-group" id="tagFilters"></div></div>
+      </div>
+      <div class="fd-row">
+        <div class="fd-k">排序</div>
+        <div class="fd-v">
+          <div class="filter-group">
+            <button class="filter-btn idle" id="sortDefaultBtn" onclick="setSortMode('default')" title="按录入顺序排列">默认顺序</button>
+            <button class="filter-btn" id="sortTimeBtn" onclick="toggleTimeSort()" title="按入库时间排列；再点一次切换方向（最近入库在前 / 最早入库在前）">入库 新→旧</button>
+            <button class="filter-btn" id="sortUsageBtn" onclick="setSortMode('usage')" title="按近 90 天打印消耗从高到低排列（依赖打印机同步）">消耗高→低</button>
+          </div>
+        </div>
+      </div>
+      <div class="fd-row">
+        <div class="fd-k">范围</div>
+        <div class="fd-v">
+          <div class="filter-group">
+            <button class="filter-btn" id="filterAmsBtn" onclick="toggleAmsFilter()" title="只显示已绑定到打印机 AMS 槽位的卷">AMS 在用</button>
+            <button class="filter-btn" id="filterUsageBtn" onclick="toggleUsedFilter()" title="只显示近 90 天有打印消耗记录的卷（依赖打印机同步）">有消耗记录</button>
+          </div>
+        </div>
+      </div>
+      <div class="fd-foot">
+        <span class="fd-hint">颜色与库存状态在工具栏上直接切换</span>
+        <button class="fd-reset" onclick="resetInvFilters()">重置全部筛选</button>
+      </div>
+    </div>
   </div>
 
   <!-- 已选颜色筛选胶囊条 -->
@@ -2461,10 +2797,12 @@ try {
     <button class="sw-clear-all" onclick="clearColorFilterAndRender()">清空</button>
   </div>
 
+  </div><!-- /#invPinned 吸顶工作台 -->
+
   <!-- Grid view（visible / active 一律交给 applyView()：默认视图可配，硬编码会双高亮） -->
   <div class="filament-grid" id="gridView"></div>
 
-  <!-- 色系 view · 单列手风琴（明暗跟随全局设置，本元素不自带主题开关） -->
+  <!-- 色系 view · 瀑布流砖墙（明暗跟随全局设置，本元素不自带主题开关） -->
   <div class="fam-view" id="famView" role="region" aria-label="色系分组"></div>
 
   <!-- 迷你卷详情浮层（锚定、非模态）：内容由 openSpoolPop 注入。
@@ -2500,12 +2838,24 @@ try {
   <!-- ══════════ 页面：色卡库 ══════════ -->
   <div class="page" id="pageSwatch" hidden>
 
-    <div class="sw-hero">
-      <div class="sw-hero-title">色卡库 · 全部品牌与颜色</div>
-      <div class="sw-hero-sub">汇集拓竹官方编号色卡、通用中文色名库与品牌名录；支持搜索、色系筛选、一键复制 HEX，并可直接带入添加面板入库。</div>
-      <div class="sw-stats" id="swStats"></div>
+    <!-- 与统计 / 数据管理 / 打印机同用 .st-hero：以前这里是 .sw-hero，标题 1.45rem
+         比其它三个页面大 30%，四个页面来回切能明显看出「字体在跳」。 -->
+    <div class="st-hero">
+      <div class="st-hero-txt">
+        <div class="st-hero-title">色卡库 · 全部品牌与颜色</div>
+        <div class="st-hero-sub">汇集拓竹官方编号色卡、通用中文色名库与品牌名录；支持搜索、色系筛选、一键复制 HEX，并可直接带入添加面板入库。</div>
+        <div class="sw-stats" id="swStats"></div>
+      </div>
+      <div class="st-hero-acts">
+        <button class="st-btn" onclick="openSwBrands()" title="查看全部品牌，点品牌直接带入添加面板">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          品牌名录 <b id="swBrandN" style="font-family:var(--font-mono)">0</b>
+        </button>
+      </div>
     </div>
 
+    <!-- 吸顶工作台：只冻搜索 + 筛选。上面的 hero 是介绍文案，跟着滚走 -->
+    <div class="pinned" id="swPinned">
     <div class="sw-toolbar">
       <div class="sw-search">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -2554,6 +2904,7 @@ try {
     </div>
 
     <div class="sw-activebar" id="swActiveBar" hidden></div>
+    </div><!-- /#swPinned 吸顶工作台 -->
 
     <div class="sw-meta"><span id="swCount"></span></div>
 
@@ -2565,13 +2916,23 @@ try {
       <div class="sw-empty-sub">换个关键词，或清除筛选条件试试</div>
       <button class="sw-btn" onclick="resetSwFilters()">清除全部筛选</button>
     </div>
+  </div>
 
-    <div class="sw-brands">
-      <div class="sw-brands-head">
-        <h3>品牌名录</h3>
-        <span class="sw-brands-hint">点击品牌 → 打开添加面板并自动填入该品牌</span>
+  <!-- 品牌名录弹层：从页面底部搬到首屏按钮后面。
+       41 个品牌 7 行曾常年躺在 692 张色卡之下（y≈29800），等于没有。 -->
+  <div class="sw-modal" id="swBrandModal" hidden>
+    <div class="sw-modal-bd" onclick="closeSwBrands()"></div>
+    <div class="sw-modal-panel wide" role="dialog" aria-modal="true" aria-labelledby="swBrandTitle">
+      <button class="sw-modal-close" onclick="closeSwBrands()" aria-label="关闭">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <div class="sw-modal-body">
+        <div class="sw-brand-head">
+          <h3 id="swBrandTitle">品牌名录</h3>
+          <span>点击品牌 → 打开添加面板并自动填入该品牌</span>
+        </div>
+        <div class="sw-brand-grid" id="swBrandGrid"></div>
       </div>
-      <div class="sw-brand-grid" id="swBrandGrid"></div>
     </div>
   </div>
 
@@ -2595,6 +2956,10 @@ try {
       </div>
     </div>
 
+    <!-- 口径 / 范围 / 统计基准：吸顶。
+         统计页有 11 张卡、2700px 高，滚到「交叉表」那段时想换个口径，
+         原来只能一路滚回顶部 —— 而库存页和色卡库早就是这个规矩了。 -->
+    <div class="pinned" id="stPinned">
     <div class="st-ctrl">
       <div class="st-ctrl-item">
         <span class="st-ctrl-label">口径</span>
@@ -2614,6 +2979,7 @@ try {
       <span class="st-ctrl-spacer"></span>
       <div class="st-meta" id="stMeta"></div>
     </div>
+    </div><!-- /#stPinned -->
 
     <div class="st-kpis" id="stKpis"></div>
     <div class="st-cards" id="stCards"></div>
@@ -2649,110 +3015,138 @@ try {
 
     <div class="st-kpis" id="dmKpis"></div>
 
-    <div class="st-cards">
+    <div class="dm-cols">
 
-      <!-- 导出 -->
-      <div class="st-card">
+      <!-- 左栏：会动手做的事 -->
+      <div class="dm-stack">
+        <!-- 导出 -->
+        <div class="st-card">
+          <div class="st-card-head">
+            <div class="st-card-ico">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </div>
+            <div class="st-card-t">
+              <div class="st-card-title">导出数据</div>
+              <div class="st-card-sub">三种用途各不同，按需选择</div>
+            </div>
+          </div>
+          <div class="dm-acts">
+            <button class="st-btn primary" onclick="dmExportJson()">JSON 完整备份</button>
+            <button class="st-btn" onclick="dmExportCsv()">CSV 库存明细</button>
+            <button class="st-btn" onclick="exportStatsCsv()">CSV 统计报告</button>
+            <button class="st-btn" onclick="dmCopyBackup()">复制到剪贴板</button>
+          </div>
+          <div class="dm-note">
+            <b>JSON 备份</b>——包含耗材、标签池、色卡收藏，可在任意设备原样恢复，推荐定期保存。<br>
+            <b>CSV 明细</b>——一行一卷，Excel / 数字表格可直接编辑，改完从右侧「导入」再导回。<br>
+            <b>复制到剪贴板</b>——没权限写文件时，可粘到备忘录里当临时备份。
+          </div>
+        </div>
+
+        <!-- 导入 -->
+        <div class="st-card">
+          <div class="st-card-head">
+            <div class="st-card-ico">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div class="st-card-t">
+              <div class="st-card-title">导入数据</div>
+              <div class="st-card-sub">支持 JSON 备份与 CSV 表格，导入前可预览</div>
+            </div>
+          </div>
+          <div class="dm-drop" id="dmDrop"
+               onclick="dmPickFile()"
+               ondragover="event.preventDefault();this.classList.add('over')"
+               ondragleave="this.classList.remove('over')"
+               ondrop="dmOnDrop(event)">
+            <div class="dm-drop-ico">📥</div>
+            <div class="dm-drop-t">点击选择文件，或把文件拖到这里</div>
+            <div class="dm-drop-s">支持 .json 备份文件 / .csv 表格（UTF-8）</div>
+          </div>
+          <div id="dmPreview"></div>
+          <input type="file" id="dmFileInput" accept=".json,.csv,.txt" hidden onchange="dmOnFile(event)">
+        </div>
+
+        <!-- 危险区原来在这（左栏最底部，y≈830）。左栏比右栏高 230px，
+             结果「清空全部耗材」被压在一屏之外 —— 越危险的按钮越不该只靠滚动才看得见。 -->
+      </div>
+
+      <!-- 右栏：状态 + 收尾
+           整理与修复从左上搬到右上：存储卡瘦身（18 行 0 B → 2 行）后右栏只剩 200px，
+           左栏还压着三张卡，两栏差 350px。搬过来两栏各约 500px，正好齐平。 -->
+      <div class="dm-stack">
+        <!-- 整理工具 -->
+        <div class="st-card">
+          <div class="st-card-head">
+            <div class="st-card-ico">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
+            </div>
+            <div class="st-card-t">
+              <div class="st-card-title">整理与修复</div>
+              <div class="st-card-sub">一键把脏数据收拾干净</div>
+            </div>
+          </div>
+          <div class="dm-acts">
+            <button class="st-btn" onclick="dmDedupe()" title="名称、品牌、材质、色值四项完全相同的记录并成一条，数量相加">合并完全重复项</button>
+            <button class="st-btn" onclick="dmRenormalize()" title="补齐缺失字段、修正非法色值与负数数量（旧版本残留数据专用）">修复非法字段</button>
+            <button class="st-btn" onclick="dmPruneTags()" title="删掉标签池里没有任何耗材在用的标签">清理未使用标签</button>
+          </div>
+        </div>
+        <!-- 存储占用 -->
+        <div class="st-card">
+          <div class="st-card-head">
+            <div class="st-card-ico">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/><path d="M4 11.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
+            </div>
+            <div class="st-card-t">
+              <div class="st-card-title">本地存储占用</div>
+              <div class="st-card-sub">浏览器给单个网站通常只有 5 MB</div>
+            </div>
+          </div>
+          <div id="dmStorage"></div>
+        </div>
+
+        <!-- 数据存放位置：只有跑起 agent（容器 / npm start）时才有意义，
+             目的很实际 —— 在 NAS 上要备份或搬机器时，得能一眼看出数据落在哪个目录 -->
+        <div class="st-card" id="dmStoreCard" style="display:none">
+          <div class="st-card-head">
+            <div class="st-card-ico">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            </div>
+            <div class="st-card-t">
+              <div class="st-card-title">数据存放位置</div>
+              <div class="st-card-sub">整个 data 目录拷走就能搬机器</div>
+            </div>
+          </div>
+          <div id="dmStorePath"></div>
+        </div>
+
+      <!-- 危险操作：从整行挪进右栏。
+           整行版本让「清空全部耗材」独占 1304px 宽度、按钮稀稀拉拉横排，
+           而右栏在存储卡瘦身后（18 行 0 B → 2 行）只剩 200px 高，下面空着一大片。
+           放回右栏底部正好补上这段，位置也从 y≈830 提前到 y≈600。 -->
+      <div class="st-card danger dm-danger">
         <div class="st-card-head">
-          <div class="st-card-ico">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <div class="st-card-ico" style="color:var(--danger)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </div>
           <div class="st-card-t">
-            <div class="st-card-title">导出数据</div>
-            <div class="st-card-sub">三种用途各不同，按需选择</div>
+            <div class="st-card-title">危险操作</div>
+            <div class="st-card-sub">以下操作都会先把当前数据存入下方回收站，误删可一键还原</div>
           </div>
         </div>
         <div class="dm-acts">
-          <button class="st-btn primary" onclick="dmExportJson()">JSON 完整备份</button>
-          <button class="st-btn" onclick="dmExportCsv()">CSV 库存明细</button>
-          <button class="st-btn" onclick="exportStatsCsv()">CSV 统计报告</button>
-          <button class="st-btn" onclick="dmCopyBackup()">复制到剪贴板</button>
+          <button class="st-btn" id="clearFinishedBtn" onclick="clearFinished()" title="删除所有数量为 0 的记录（先进回收站，可还原）">清理用完的记录</button>
+          <button class="st-btn" onclick="dmLoadSample()" title="用 8 条内置示例替换当前库存，当前数据先进回收站">恢复示例数据</button>
+          <button class="st-btn" onclick="dmClearAll()" style="border-color:oklch(from var(--danger) l c h / 0.55);color:var(--danger)" title="清空全部耗材记录；标签池与色卡收藏保留">清空全部耗材</button>
         </div>
-        <div class="dm-note">
-          <b>JSON 备份</b>——包含耗材、标签池、色卡收藏，可在任意设备原样恢复，推荐定期保存。<br>
-          <b>CSV 明细</b>——一行一卷，Excel / 数字表格可直接编辑，改完从右侧「导入」再导回。<br>
-          <b>复制到剪贴板</b>——没权限写文件时，可粘到备忘录里当临时备份。
-        </div>
+      </div>
       </div>
 
-      <!-- 导入 -->
-      <div class="st-card">
-        <div class="st-card-head">
-          <div class="st-card-ico">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          </div>
-          <div class="st-card-t">
-            <div class="st-card-title">导入数据</div>
-            <div class="st-card-sub">支持 JSON 备份与 CSV 表格，导入前可预览</div>
-          </div>
-        </div>
-        <div class="dm-drop" id="dmDrop"
-             onclick="dmPickFile()"
-             ondragover="event.preventDefault();this.classList.add('over')"
-             ondragleave="this.classList.remove('over')"
-             ondrop="dmOnDrop(event)">
-          <div class="dm-drop-ico">📥</div>
-          <div class="dm-drop-t">点击选择文件，或把文件拖到这里</div>
-          <div class="dm-drop-s">支持 .json 备份文件 / .csv 表格（UTF-8）</div>
-        </div>
-        <div id="dmPreview"></div>
-        <input type="file" id="dmFileInput" accept=".json,.csv,.txt" hidden onchange="dmOnFile(event)">
-      </div>
-
-      <!-- 存储占用 -->
-      <div class="st-card">
-        <div class="st-card-head">
-          <div class="st-card-ico">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/><path d="M4 11.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
-          </div>
-          <div class="st-card-t">
-            <div class="st-card-title">本地存储占用</div>
-            <div class="st-card-sub">浏览器给单个网站通常只有 5 MB</div>
-          </div>
-        </div>
-        <div id="dmStorage"></div>
-      </div>
-
-      <!-- 数据存放位置：只有跑起 agent（容器 / npm start）时才有意义，
-           目的很实际 —— 在 NAS 上要备份或搬机器时，得能一眼看出数据落在哪个目录 -->
-      <div class="st-card" id="dmStoreCard" style="display:none">
-        <div class="st-card-head">
-          <div class="st-card-ico">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-          </div>
-          <div class="st-card-t">
-            <div class="st-card-title">数据存放位置</div>
-            <div class="st-card-sub">整个 data 目录拷走就能搬机器</div>
-          </div>
-        </div>
-        <div id="dmStorePath"></div>
-      </div>
-
-      <!-- 整理工具 -->
-      <div class="st-card">
-        <div class="st-card-head">
-          <div class="st-card-ico">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
-          </div>
-          <div class="st-card-t">
-            <div class="st-card-title">整理与修复</div>
-            <div class="st-card-sub">一键把脏数据收拾干净</div>
-          </div>
-        </div>
-        <div class="dm-acts">
-          <button class="st-btn" onclick="dmDedupe()">合并完全重复项</button>
-          <button class="st-btn" onclick="dmRenormalize()">修复非法字段</button>
-          <button class="st-btn" onclick="dmPruneTags()">清理未使用标签</button>
-        </div>
-        <div class="dm-note">
-          <b>合并重复项</b>——名称、品牌、材质、色值四项完全相同的记录会并成一条，数量相加。<br>
-          <b>修复非法字段</b>——补齐缺失字段、修正非法色值与负数数量（旧版本残留数据专用）。<br>
-          <b>清理未使用标签</b>——删掉标签池里没有任何耗材在用的标签。
-        </div>
-      </div>
+    </div>
 
       <!-- 回收站 -->
-      <div class="st-card wide">
+      <div class="st-card dm-trash">
         <div class="st-card-head">
           <div class="st-card-ico">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
@@ -2769,28 +3163,6 @@ try {
         <div id="dmTrash"></div>
       </div>
 
-      <!-- 危险区 -->
-      <div class="st-card danger">
-        <div class="st-card-head">
-          <div class="st-card-ico" style="color:var(--danger)">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          </div>
-          <div class="st-card-t">
-            <div class="st-card-title">危险操作</div>
-            <div class="st-card-sub">以下操作都会先把当前数据存入回收站</div>
-          </div>
-        </div>
-        <div class="dm-acts">
-          <button class="st-btn" onclick="dmLoadSample()">恢复示例数据</button>
-          <button class="st-btn" onclick="dmClearAll()" style="border-color:oklch(from var(--danger) l c h / 0.55);color:var(--danger)">清空全部耗材</button>
-        </div>
-        <div class="dm-note">
-          <b>恢复示例数据</b>会用 8 条内置示例替换当前库存（想从零开始时很好用）。<br>
-          <b>清空全部耗材</b>只清耗材，标签池与色卡收藏保留。
-        </div>
-      </div>
-
-    </div>
   </div>
 
   <!-- ══════════ 页面：打印机 ══════════ -->
@@ -2835,10 +3207,11 @@ try {
     </div>
 
     <div id="prnOnlineArea" hidden>
+      <div class="prn-sec"><span>设备与连接</span></div>
       <div class="prn-grid" id="prnGrid"></div>
 
       <!-- 拓竹云 · 切片用量：第三方无 RFID 料盘唯一能拿到「这次用了多少克」的途径 -->
-      <div class="st-card" id="prnCloudCard" style="margin-top:16px">
+      <div class="st-card" id="prnCloudCard">
         <div class="st-card-head">
           <div class="st-card-ico">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 .5-8.97A6.5 6.5 0 0 0 5.2 11.2A3.4 3.4 0 0 0 6 19h11.5Z"/></svg>
@@ -2869,7 +3242,7 @@ try {
           <button class="st-btn primary" onclick="prnAddPrinter()">添加并连接</button>
         </div>
       </div>
-      <div class="st-card" style="margin-top:16px">
+      <div class="st-card">
         <div class="st-card-head">
           <div class="st-card-ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4.5 4.5"/></svg></div>
           <div class="st-card-t">
@@ -2881,7 +3254,7 @@ try {
         </div>
         <div class="st-body" id="prnDiscoverBox"></div>
       </div>
-      <div class="st-card" style="margin-top:16px">
+      <div class="st-card">
         <div class="st-card-head">
           <div class="st-card-t">
             <div class="st-card-title">低库存预警阈值</div>
@@ -2909,7 +3282,7 @@ try {
           <div class="toggle" id="prnAutoSyncToggle" role="switch" aria-checked="false" tabindex="0" onclick="prnToggleAutoSync()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();prnToggleAutoSync()}"></div>
         </div>
       </div>
-      <div class="st-card" style="margin-top:16px">
+      <div class="st-card">
         <div class="st-card-head">
           <div class="st-card-t">
             <div class="st-card-title">自动匹配策略</div>
@@ -2942,7 +3315,7 @@ try {
       </div>
     </div>
 
-    <div class="st-card" style="margin-top:16px" id="prnSwapCard" hidden>
+    <div class="st-card" id="prnSwapCard" hidden>
       <div class="st-card-head">
         <div class="st-card-t">
           <div class="st-card-title">识别到换卷</div>
@@ -2952,7 +3325,33 @@ try {
       <div class="st-body" id="prnSwapBar"></div>
     </div>
 
-    <div class="st-card" style="margin-top:16px">
+    <!-- 离线时这 4 张卡全是「暂无记录」+ 一个点不出东西的「刷新列表」，
+         加起来 700px 的死信息。收进 #prnDataArea，离线改为下面那张清单卡。 -->
+    <div id="prnOfflineData" hidden>
+      <div class="st-card">
+        <div class="st-card-head">
+          <div class="st-card-ico" style="color:var(--text-3)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6"/><path d="M12 16v6"/><path d="M2 12h6"/><path d="M16 12h6"/><circle cx="12" cy="12" r="4"/></svg>
+          </div>
+          <div class="st-card-t">
+            <div class="st-card-title">这些面板要等服务起来才有内容</div>
+            <div class="st-card-sub">本地服务未启动，下面四项暂时没有数据可读。启动后会自动出现在这里，无需手动刷新。</div>
+          </div>
+          <span class="spacer"></span>
+          <button class="st-btn primary" onclick="prnRecheckAgent()">重新检测服务</button>
+        </div>
+        <div class="prn-off-list">
+          <div class="prn-off-item"><b>待确认 / 待新建</b><span>自动匹配失败的槽位，确认后才写进库存</span></div>
+          <div class="prn-off-item"><b>数据体检</b><span>AMS 实测、绑定关系、库存余量、记账流水四份数据对账</span></div>
+          <div class="prn-off-item"><b>校准流水</b><span>无 RFID 料盘每次改余量记一条，差值即实际消耗</span></div>
+          <div class="prn-off-item"><b>切片用量流水</b><span>任务结束时按云端分槽克重自动扣减的记录，可撤销</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="prnDataArea">
+    <div class="prn-sec"><span>对账与流水</span></div>
+    <div class="st-card">
       <div class="st-card-head">
         <div class="st-card-t">
           <div class="st-card-title">待确认 / 待新建</div>
@@ -2964,7 +3363,7 @@ try {
       <div class="st-body" id="prnPending"></div>
     </div>
 
-    <div class="st-card" style="margin-top:16px" id="prnAuditCard">
+    <div class="st-card" id="prnAuditCard">
       <div class="st-card-head">
         <div class="st-card-t">
           <div class="st-card-title">数据体检</div>
@@ -2978,7 +3377,7 @@ try {
       <div class="st-body" id="prnAuditBox"></div>
     </div>
 
-    <div class="st-card" style="margin-top:16px">
+    <div class="st-card">
       <div class="st-card-head">
         <div class="st-card-t">
           <div class="st-card-title">校准流水</div>
@@ -2990,7 +3389,7 @@ try {
       <div class="st-body" id="prnCalibList"></div>
     </div>
 
-    <div class="st-card" style="margin-top:16px">
+    <div class="st-card">
       <div class="st-card-head">
         <div class="st-card-t">
           <div class="st-card-title">切片用量流水</div>
@@ -3001,9 +3400,33 @@ try {
       </div>
       <div class="st-body" id="prnSlicedList"></div>
     </div>
+    </div><!-- /#prnDataArea -->
   </div>
 
 </main>
+
+<!-- 批量操作条：吸底浮条，脱离 #invPinned。
+     原来它插在统计卡下面，进编辑模式会把内容整体下推 76px，
+     而选中第 50 卷时这条「已选中 / 批量删除」早就滚出屏幕了。
+     现在固定在底部：始终可见、不推动内容，选中多少条都看得见。 -->
+<div class="batch-bar" id="batchBar" role="region" aria-label="批量操作">
+  <div class="batch-inner">
+    <label class="batch-all">
+      <input type="checkbox" id="batchSelectAll" onclick="toggleSelectAll()"> 全选
+    </label>
+    <span class="batch-bar-text">已选中 <strong id="selectedCount">0</strong> 条</span>
+    <span style="flex:1"></span>
+    <button class="btn-batch-clear" onclick="clearSelection()">取消选择</button>
+    <button class="btn-batch-edit" id="batchEditBtn" onclick="openBatchEditModal()" disabled>批量编辑</button>
+    <button class="btn-batch-delete" id="batchDeleteBtn" onclick="batchDelete()" disabled>批量删除</button>
+  </div>
+</div>
+
+<!-- 回到顶部：所有页面共用一个 —— 这是单页应用，切页不换 DOM。
+     默认 visibility:hidden 而不是 display:none：focus 时不会跳出来，滚动超过 320px 才显示。 -->
+<button class="to-top" id="toTop" type="button" onclick="jumpTop()" aria-label="回到顶部" title="回到顶部">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+</button>
 </div>
 
 <!-- ── 设置（外观 + 默认视图） ──
@@ -3941,7 +4364,7 @@ let statusFilter = 'all';
 let materialFilter = 'all';
 let tagFilter = 'all';
 let brandFilter = 'all';
-let sortMode = 'default';       // 'default' 录入顺序 | 'usage' 近 90 天消耗从高到低
+let sortMode = 'default';       // 'default' 录入顺序 | 'usage' 近 90 天消耗高→低 | 'new' 入库新→旧 | 'old' 入库旧→新
 let amsFilter = false;          // 只显示已绑定 AMS 槽位的卷
 let usedFilter = false;         // 只显示近 90 天有消耗记录的卷
 let editingId = null;
@@ -3951,26 +4374,22 @@ let selectedIds = new Set();
 let formTags = [];  // current modal's selected tags
 let editingTagName = null;  // inline edit state for tag panel
 
-/* ── 色系墙的两项设备本地偏好 ──
-   2026-10 重构：单列手风琴 → 4 列卡片墙。那套「记用户主动收起的色系」的折叠状态机
-   （一个 Set + 五个函数）整体删除 —— 卡片墙没有折叠态，每张卡永远在展示内容，
-   装不下的部分进「还有 N 卷」与行内面板。
-   取代它们的是两个偏好（都走 fmTheme / fmDefaultView 那条路：裸字符串进 localStorage，
-   **不进** FM.SYNC、不进备份清单、服务端 SYNC_KEYS 里也没有它们）：
+/* ── 色系墙的设备本地偏好 ──
+   2026-10 二次重构：卡片墙 + 行内面板 → **瀑布流砖墙**。
+   那套「截断 + 点开面板看全量」的机制整体删除 —— 用户要的是**一进来就全看得见**，
+   于是 cap / 「还有 N 卷」/ 行内展开面板 / 紧凑-标准两档全部消失，
+   只剩一个偏好（走 fmTheme / fmDefaultView 那条路：裸字符串进 localStorage，
+   **不进** FM.SYNC、不进备份清单、服务端 SYNC_KEYS 里也没有它）：
 
      · fmFamDensity：'mini' 迷你卷（默认）| 'card' 完整卡片
-     · fmFamRows   ：'compact' 每卡少露几行 | 'default' 多露几行（默认）
 
    这里读的是 localStorage 原始字符串（不走 lsGet —— 它内部 JSON.parse 会抛错）。 */
 const FAM_DENSITY_KEY = 'fmFamDensity';
-const FAM_ROWS_KEY = 'fmFamRows';
 function famReadPref(key, ok, dft) {
   try { return ok(localStorage.getItem(key)) || dft; } catch (e) { return dft; }
 }
 const famDensityOk = v => (v === 'mini' || v === 'card' ? v : null);
-const famRowsOk = v => (v === 'compact' || v === 'default' ? v : null);
 let famDensity = famReadPref(FAM_DENSITY_KEY, famDensityOk, 'mini');
-let famRows = famReadPref(FAM_ROWS_KEY, famRowsOk, 'default');
 
 /* ── 色系常量（供库存页颜色筛选与色卡库共用；原定义在色卡库区块，
       因首次 renderAll() 早于该处，const 的 TDZ 会抛错，故上移至此） ── */
@@ -5245,28 +5664,39 @@ function renderStats() {
   const withSpool = data.filter(d => d.hasSpool).length;
   const finishedCount = data.filter(d => d.qty <= 0).length;
 
+  /* 五张卡全是下钻入口（<button>），不是展示牌：
+     前三个直接落到筛选结果，「总重量 / 有料盘」没有单维筛选可落，
+     就送去统计页 —— 那里才有重量分布和料盘占比可以看。 */
   document.getElementById('statsBar').innerHTML = `
-    <div class="stat-card">
+    <button type="button" class="stat-card" onclick="statJump('total')" title="查看全部耗材（清空筛选）">
       <div class="stat-label">耗材总数</div>
       <div class="stat-value">${total}</div>
-    </div>
-    <div class="stat-card">
+    </button>
+    <button type="button" class="stat-card" onclick="statJump('instock')" title="筛出至少还有一卷的耗材">
       <div class="stat-label">有库存</div>
       <div class="stat-value">${inStock}</div>
-    </div>
-    <div class="stat-card">
+    </button>
+    <button type="button" class="stat-card" onclick="statJump('weight')" title="去统计页看重量分布">
       <div class="stat-label">总重量</div>
       <div class="stat-value accent">${totalKg} <span class="stat-unit">kg</span></div>
-    </div>
-    <div class="stat-card">
+    </button>
+    <button type="button" class="stat-card" onclick="statJump('finished')" title="筛出数量为 0 的记录">
       <div class="stat-label">已用完</div>
       <div class="stat-value${finishedCount > 0 ? ' danger' : ' zero'}">${finishedCount}</div>
-    </div>
-    <div class="stat-card">
+    </button>
+    <button type="button" class="stat-card" onclick="statJump('spool')" title="去统计页看料盘占比">
       <div class="stat-label">有料盘</div>
       <div class="stat-value">${withSpool}</div>
-    </div>
+    </button>
   `;
+}
+
+/* 统计卡下钻。'total' 是「回到全部」，所以它得先清干净再渲染 ——
+   否则用户点了「27」看到 3 条，会以为数字错了。 */
+function statJump(k) {
+  if (k === 'instock' || k === 'finished') { setStatusFilter(k); return; }
+  if (k === 'total') { resetInvFilters(); return; }
+  switchPage('stats');
 }
 
 /* ══════════════════════════════
@@ -5304,7 +5734,76 @@ function setMaterialFilter(v) { materialFilter = v; renderAll(); }
 function setTagFilter(v) { tagFilter = v; renderAll(); }
 function setBrandFilter(v) { brandFilter = v; renderAll(); }
 function setStatusFilter(v) { statusFilter = v; renderAll(); }
-function setSortMode(v)     { sortMode = (v === 'usage') ? 'usage' : 'default'; renderAll(); }
+
+/* ── 筛选抽屉 ──
+   品牌 / 材质 / 标签 / 排序 / AMS / 有消耗 六组原来铺在工具栏里占两整行，
+   吸顶后白吃 88px。收进抽屉后工具栏只剩一行，吸顶区一并矮下来。
+   抽屉绝对定位、不参与排版，展开时既不推内容也不改吸顶高度。 */
+function filterDrawerEl() { return document.getElementById('filterDrawer'); }
+function openFilterDrawer() {
+  const d = filterDrawerEl();
+  if (!d || !d.hidden) return;
+  closeColorPanel();                        // 两个浮层不能同时开，会互相压
+  d.hidden = false;
+  const b = document.getElementById('moreFilterBtn');
+  if (b) b.setAttribute('aria-expanded', 'true');
+}
+function closeFilterDrawer() {
+  const d = filterDrawerEl();
+  if (!d || d.hidden) return;
+  d.hidden = true;
+  const b = document.getElementById('moreFilterBtn');
+  if (b) b.setAttribute('aria-expanded', 'false');
+}
+function toggleFilterDrawer() {
+  const d = filterDrawerEl();
+  if (!d) return;
+  if (d.hidden) openFilterDrawer(); else closeFilterDrawer();
+}
+
+/* 抽屉里生效的条件数。颜色不算 —— 它自己就在工具栏上带徽标，
+   两边都算会让人以为徽标是「总数」而实际对不上。 */
+function moreFilterCount() {
+  let n = 0;
+  if (brandFilter !== 'all') n++;
+  if (materialFilter !== 'all') n++;
+  if (tagFilter !== 'all') n++;
+  if (sortMode !== 'default') n++;
+  if (amsFilter) n++;
+  if (usedFilter) n++;
+  return n;
+}
+/* 徽标只是「有没有藏在抽屉里的条件」的提示，不是计数仪表盘。
+   有就写数字（知道是 2 个还是 5 个），没有就整个隐掉 —— 常驻一个 0
+   会训练用户忽略它，等真变成 3 的时候也看不见。 */
+function refreshFilterDrawer() {
+  const n = moreFilterCount();
+  const c = document.getElementById('moreFilterCount');
+  const b = document.getElementById('moreFilterBtn');
+  if (c) { c.hidden = n === 0; c.textContent = String(n); }
+  if (b) b.classList.toggle('has-sel', n > 0);
+}
+
+/* 重置全部筛选：统计卡「耗材总数」和抽屉底部的重置都用它。
+   顺带清搜索框 —— 只清筛选不清搜索，是最常见的「点了我以为变了」事故。 */
+function resetInvFilters() {
+  const had = brandFilter !== 'all' || materialFilter !== 'all' || tagFilter !== 'all'
+    || statusFilter !== 'all' || sortMode !== 'default' || amsFilter || usedFilter
+    || colorFamFilter.size > 0 || colorHexFilter.size > 0
+    || !!(document.getElementById('searchInput') || {}).value;
+  brandFilter = 'all'; materialFilter = 'all'; tagFilter = 'all';
+  statusFilter = 'all'; sortMode = 'default'; amsFilter = false; usedFilter = false;
+  clearColorFilter();
+  const si = document.getElementById('searchInput');
+  if (si) si.value = '';
+  flushSearch();
+  if (had) toast('已清空全部筛选', 'info');
+}
+function setSortMode(v)     { sortMode = (v === 'usage' || v === 'new' || v === 'old') ? v : 'default'; renderAll(); }
+/* 「入库时间」是一个维度的两个方向：连点就在 新→旧 / 旧→新 之间翻。
+   从别的排序切过来一律先进 新→旧 —— 「最近入库的排前面」是绝大多数时候要的，
+   想看最早入库的再点一次。按钮文案跟着当前方向变，不用回抽屉确认。 */
+function toggleTimeSort()   { sortMode = (sortMode === 'new') ? 'old' : 'new'; renderAll(); }
 function toggleAmsFilter()  { amsFilter = !amsFilter; renderAll(); }
 function toggleUsedFilter() { usedFilter = !usedFilter; renderAll(); }
 /* ══════════════════════════════
@@ -5355,9 +5854,6 @@ function setTheme(v) {
 
 /* 只切显示态，不渲染 —— init 里也要能单独调（此时 data 还没渲染） */
 function applyView(v) {
-  /* 切视图前先收面板。renderAll 在非 fam 视图下**不重建** #famView（6137 那行是
-     `if (currentView === 'fam')`），不在这里收就会「切到网格、再切回来，面板还悬在那儿」。 */
-  closeFamPanel();
   currentView = fmViewOk(v) || 'fam';
   VIEWS.forEach(x => {
     const el = document.getElementById(x.el);
@@ -5648,15 +6144,26 @@ function renderColorFilterControls() {
     </span>`).join('');
 }
 
-/* 点击面板/胶囊条之外关闭；Esc 关闭（色卡大图优先） */
+/* 点击浮层之外关闭；Esc 关闭（色卡大图优先）。
+   两个浮层各自算各自的「之外」：点颜色按钮只收抽屉，点筛选按钮只收颜色面板。 */
 document.addEventListener('click', e => {
-  if (e.target && e.target.closest && (e.target.closest('.cf-wrap') || e.target.closest('.cf-activebar'))) return;
-  closeColorPanel();
+  const t = e.target;
+  const inCf = !!(t && t.closest && (t.closest('.cf-wrap') || t.closest('.cf-activebar')));
+  const inFd = !!(t && t.closest && (t.closest('#filterDrawer') || t.closest('#moreFilterBtn')));
+  if (!inCf) closeColorPanel();
+  if (!inFd) closeFilterDrawer();
 });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   const modal = document.getElementById('swModal');
   if (modal && !modal.hidden) return;
+  const fd = document.getElementById('filterDrawer');
+  if (fd && !fd.hidden) {
+    closeFilterDrawer();
+    const b = document.getElementById('moreFilterBtn');
+    if (b) b.focus();
+    return;
+  }
   const p = document.getElementById('colorFilterPanel');
   if (p && !p.hidden) {
     closeColorPanel();
@@ -5678,6 +6185,35 @@ function onSearchInput() {
 function flushSearch() {
   if (searchTimer) { clearTimeout(searchTimer); searchTimer = null; }
   renderAll();
+}
+
+/* ── 入库时间 ──
+   createdAt 是 ISO 字符串（normalizeItem 只认能被 Date.parse 解析的值，否则写 null）。
+   缺失/非法一律返回 null，交给排序函数沉底 —— 升序时若让它参与比较，
+   一屏老数据会全被顶到最前面，看着像「1970 年入的库」。 */
+function invTimeOf(d) {
+  const s = d && d.createdAt;
+  if (!s) return null;
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? t : null;
+}
+function sortIsTime() { return sortMode === 'new' || sortMode === 'old'; }
+/* 卡片/列表行上的短日期：今年省年份（9-14），跨年补两位年份（25-9-14）。
+   只在「按入库时间排序」时出现 —— 平时不占位置，需要核对顺序时才现身。 */
+function invDateLabel(iso) {
+  const t = Date.parse(iso || '');
+  if (!Number.isFinite(t)) return '';
+  const d = new Date(t);
+  const md = `${d.getMonth() + 1}-${d.getDate()}`;
+  return d.getFullYear() === new Date().getFullYear() ? md : `${String(d.getFullYear()).slice(2)}-${md}`;
+}
+/* 时间排序的比较器：dir -1 = 新→旧，1 = 旧→新。未知时间不参与方向，永远沉底。
+   ES2019 起 sort 稳定，同一毫秒（批量导入）保原序。 */
+function invTimeCmp(a, b) {
+  const ta = invTimeOf(a), tb = invTimeOf(b);
+  if (ta === null) return tb === null ? 0 : 1;
+  if (tb === null) return -1;
+  return (sortMode === 'new' ? -1 : 1) * (ta - tb);
 }
 
 function getFiltered() {
@@ -5708,6 +6244,8 @@ function getFiltered() {
     // 消耗高→低；无消耗记录一律沉底（用 -1 参与比较但不与真实值混淆），ES2019 稳定排序保同值原序
     const g = x => prnUsageOf(x);
     out.sort((a, b) => (g(b) > 0 ? g(b) : -1) - (g(a) > 0 ? g(a) : -1));
+  } else if (sortIsTime()) {
+    out.sort(invTimeCmp);
   }
   return out;
 }
@@ -5734,6 +6272,615 @@ function spoolSvg(color, hasSpool) {
     </svg>
   `;
 }
+
+/* ══════════════════════════════
+   卡片色块 · 悬停液体洪水（单例 WebGL）
+   ── 参考 useplanes 的 shader-flood（Pro 组件，源码不可得），按它公开的原理
+      「单个 fragment shader + 离屏即暂停」自写一份等价实现。三条不可动摇的前提：
+      · 全站只有 1 个 canvas / 1 个上下文。200 条数据时 #gridView 与 #famView 同时
+        各有 200 张卡，每卡一个上下文会撞浏览器 16 个的上限。
+      · 悬停时把 canvas 移进那张卡的 .card-swatch，离开移回隐藏宿主。canvas 换父节点
+        时上下文保留；裁剪与卡片圆角交给 .card-swatch 的 overflow:hidden。
+      · 静止态 canvas 根本不在卡片里，且 uProg=0 时片元直接输出全透明 —— 双重保证
+        色块与改造前逐像素一致。
+      指针坐标一律用 el.onpointermove 赋值，不挂全局 pointermove（12.10 那条断言盯着它）。
+   ══════════════════════════════ */
+const FX_AMT = 0.9;        // 总强度：唯一的手感常量，嫌花就 0.75 / 0.45
+const FX_IN_MS = 620;      // 漫开时长
+const FX_OUT_MS = 300;     // 收拢时长
+const FX_DPR_MAX = 2;      // 4K 屏 dpr=3 收益近乎为零、成本 ×2.25
+const FX_GRAY_HUE = 214;   // 白/灰/黑借一点冷色相，否则三色只是三条灰
+
+/* ── 颜色推导：hex → base / 提亮一阶 / 压深一阶 ──
+   中性色（S<0.10）色相无意义，统一注入 FX_GRAY_HUE；提亮与压深幅度都封顶 ±0.26，
+   深色一步跨到 0.4 就变成另一个颜色了。白（L=1）没有「更亮」的去处，提亮档改成
+   冷色相淡彩（靠色相+彩度区分）；近黑则压深无效，由提亮档承担运动。 */
+function fxParseColor(v) {
+  if (Array.isArray(v)) return v.slice(0, 3);
+  const s = String(v == null ? '' : v).trim().toLowerCase();
+  let m = s.match(/^#([0-9a-f]{3,8})$/);
+  if (m) {
+    const h = m[1];
+    if (h.length === 3 || h.length === 4) {
+      return [parseInt(h[0] + h[0], 16) / 255, parseInt(h[1] + h[1], 16) / 255, parseInt(h[2] + h[2], 16) / 255];
+    }
+    if (h.length === 6 || h.length === 8) {
+      return [parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255];
+    }
+    return null;
+  }
+  m = s.match(/^rgba?\(([^)]+)\)$/);
+  if (m) {
+    const p = m[1].split(/[\s,\/]+/).filter(Boolean).slice(0, 3);
+    if (p.length === 3) {
+      const one = x => (x.indexOf('%') >= 0 ? parseFloat(x) / 100 : parseFloat(x) / 255);
+      const out = p.map(one);
+      if (out.every(Number.isFinite)) return out.map(x => Math.min(1, Math.max(0, x)));
+    }
+  }
+  return null;
+}
+
+function fxRgbToHsl(r, g, b) {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  const l = (mx + mn) / 2;
+  if (d < 1e-6) return [0, 0, l];
+  const s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+  let h;
+  if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
+  else if (mx === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return [h * 60, s, l];
+}
+
+function fxHslToRgb(h, s, l) {
+  h = (((h % 360) + 360) % 360) / 360;
+  if (s <= 1e-6) return [l, l, l];
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const f = t => {
+    t = (t + 1) % 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 0.5) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  return [f(h + 1 / 3), f(h), f(h - 1 / 3)];
+}
+
+const fxColorCache = new Map();
+function fxColors(hex) {
+  const key = String(hex);
+  if (fxColorCache.has(key)) return fxColorCache.get(key);
+  const base = fxParseColor(key) || [0.533, 0.533, 0.533];
+  const hsl = fxRgbToHsl(base[0], base[1], base[2]);
+  const h0 = hsl[0], s0 = hsl[1], l0 = hsl[2];
+  const neutral = s0 < 0.10;
+  const hue = neutral ? FX_GRAY_HUE : h0;
+  const chroma = c => Math.min(1, Math.max(c, neutral ? 0.18 : 0));
+
+  let hi = fxHslToRgb(hue, chroma(s0 * 0.90),
+    Math.min(1, l0 + Math.min(0.26, Math.max(0.10, (1 - l0) * 0.45))));
+  let lo = fxHslToRgb(hue + (neutral ? 0 : 6), chroma(Math.min(1, s0 * 1.15)),
+    Math.max(0, l0 - Math.min(0.26, Math.max(0.10, l0 * 0.45))));
+
+  /* 兜底：白/近黑在某些分支里会和基色差不到 0.05（白没有更亮的去处、黑没有更暗的），
+     此时改用色相+彩度拉开，保证「洪水一定看得见」这条不变量。 */
+  const dmax = (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
+  if (dmax(base, hi) < 0.05) hi = fxHslToRgb(hue, chroma(0.22), Math.max(0.02, l0 - 0.09));
+  if (dmax(base, lo) < 0.05) lo = fxHslToRgb(hue, chroma(0.24), Math.max(0.02, l0 - 0.10));
+
+  const out = { base, hi, lo };
+  fxColorCache.set(key, out);
+  return out;
+}
+
+/* ── 着色器 ──
+   静止：uProg<=0 整帧透明（露出下面原有的纯色）。
+   漫开：edge = uProg*1.18 + 噪声；1.18-0.16 > 1.0，而 uMaxDist 就是指针到最远角的
+        距离，所以 uProg=1 时四角必然被盖住。末段 calm 把噪声收敛掉，避免噪声啃角。
+   注意 smoothstep 一律升序传参：edge0 >= edge1 在 GLSL ES 里是未定义行为。 */
+const FX_VS = `
+attribute vec2 aPos;
+void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }
+`;
+
+const FX_FS = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+
+uniform vec2  uRes;
+uniform vec2  uOrigin;
+uniform float uMaxDist;
+uniform float uProg;
+uniform float uTime;
+uniform float uAmt;
+uniform vec3  uC0;
+uniform vec3  uC1;
+uniform vec3  uC2;
+
+float hash21(vec2 p){
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  float a = hash21(i);
+  float b = hash21(i + vec2(1.0, 0.0));
+  float c = hash21(i + vec2(0.0, 1.0));
+  float d = hash21(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+float fbm(vec2 p){
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++){
+    v += a * vnoise(p);
+    p = p * 2.03 + vec2(19.7, 7.3);
+    a *= 0.5;
+  }
+  return v;
+}
+
+void main(){
+  if (uProg <= 0.0005) { gl_FragColor = vec4(0.0); return; }
+
+  vec2  p   = gl_FragCoord.xy / uRes;
+  float asp = uRes.x / max(uRes.y, 1.0);
+  vec2  q   = p * vec2(asp, 1.0);
+  float t   = uTime;
+
+  vec2 w = vec2(
+    fbm(q * 1.9 + vec2(t * 0.22, t * 0.13)),
+    fbm(q * 1.9 + vec2(-t * 0.17, t * 0.19) + 4.7)
+  ) - 0.5;
+  float wob = fbm(q * 2.9 + w * 2.6 + vec2(0.0, t * 0.35));
+
+  vec2  dv   = (gl_FragCoord.xy - uOrigin) / max(uMaxDist, 1.0);
+  float dist = length(dv);
+
+  float calm = 1.0 - smoothstep(0.60, 1.0, uProg);
+  float edge = uProg * 1.18 + (wob - 0.5) * 0.40 * calm;
+  float m    = 1.0 - smoothstep(edge - 0.16, edge, dist);
+
+  float band  = clamp(dist / max(edge, 0.0001), 0.0, 1.0);
+
+  /* 内部不能只是一条径向渐变 —— 那样看着像模糊的光晕，不像液体。
+     两层噪声叠出「团块」，再用等值线勾一层细脉络，才有翻滚感。 */
+  float n1 = fbm(q * 1.7 + w * 2.4 + vec2(t * 0.07, -t * 0.05));
+  float n2 = fbm(q * 4.3 + w * 1.5 + vec2(-t * 0.14, t * 0.10));
+  float blob = smoothstep(0.40, 0.78, n1 + (n2 - 0.5) * 0.44);
+
+  vec3 col = mix(uC0, uC1, blob * 0.88);
+  col = mix(col, uC2, smoothstep(0.50, 1.02, band) * 0.85);   // 外圈压深，液体有厚度
+
+  float vein = 1.0 - smoothstep(0.0, 0.055, abs(n1 - 0.52));  // 脉络：噪声等值线
+  col = mix(col, uC1, vein * 0.30);
+
+  /* 湿边：波前内侧一圈压深 + 紧贴前沿一线高光。同色系洪水与底色只差明度，
+     没有这组深浅对照，漫开的边界几乎看不出来（蓝/绿尤其明显）。
+     满程时波前已经在卡外，这圈"湿边"就该消失 —— 否则会留下一个无来由的暗环。 */
+  float front = 1.0 - smoothstep(0.86, 1.0, uProg);
+  float wet = smoothstep(edge - 0.36, edge - 0.28, dist) * (1.0 - smoothstep(edge - 0.18, edge - 0.08, dist));
+  col = mix(col, uC2, wet * 0.62 * front);
+  float rim = 1.0 - smoothstep(0.0, 0.045, abs(dist - (edge - 0.06)));
+  col = mix(col, uC1, rim * 0.45 * front);
+
+  float sheen = fbm(q * 3.6 + vec2(t * 0.30, -t * 0.22) + w * 1.4);
+  col += (sheen - 0.5) * 0.10;
+
+  float alpha = m * uAmt * mix(0.74, 1.0, smoothstep(0.0, 0.34, band));
+  gl_FragColor = vec4(clamp(col, 0.0, 1.0), clamp(alpha, 0.0, 1.0));
+}
+`;
+
+const fxState = {
+  mounted: false, on: true, failed: false, frozen: false,
+  debug: /[?&]cardfx=1/.test(location.search),
+  canvas: null, host: null, gl: null, prog: null, u: null, creates: 0,
+  card: null, swatch: null, rect: null, rectScrollY: -1,
+  state: 'idle', t0: 0, progVal: 0, progFrom: 0,
+  w: 0, h: 0, px: 0.5, py: 0.45, tx: 0.5, ty: 0.45,
+  colors: null, raf: 0, last: 0, frames: 0, clock0: 0,
+  lastClientX: -1, lastClientY: -1, lastId: null, lastAt: 0, inside: false, resumeId: null,
+};
+
+function fxOk() {
+  const s = fxState;
+  if (!s.on || s.failed || !s.canvas) return false;
+  if (document.hidden) return false;
+  if (window.matchMedia) {
+    /* 与 2253 行那条 CSS 兜底同一个判据：用户要减少动效就彻底不做，不是调快 */
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+    if (window.matchMedia('(hover: none)').matches) return false;   // 触屏没有真悬停
+  }
+  return true;
+}
+
+function fxMount() {
+  const s = fxState;
+  if (s.mounted) return;
+  s.mounted = true;
+  if (fmPrefRaw('fmCardFx') === '0') { s.on = false; return; }
+
+  const host = document.createElement('div');
+  host.className = 'card-fx-host';
+  host.setAttribute('aria-hidden', 'true');
+  const cv = document.createElement('canvas');
+  cv.className = 'card-fx';
+  cv.setAttribute('aria-hidden', 'true');
+  host.appendChild(cv);
+  document.body.appendChild(host);
+  s.host = host;
+  s.canvas = cv;
+  s.clock0 = performance.now();
+
+  document.addEventListener('pointerover', fxOnOver, { passive: true });
+  document.addEventListener('pointerout', fxOnOut, { passive: true });
+  window.addEventListener('resize', fxOnResize, { passive: true });
+  document.addEventListener('visibilitychange', fxOnVis);
+  if (window.matchMedia) {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onMq = () => { if (mq.matches) fxPark(); };
+    if (mq.addEventListener) mq.addEventListener('change', onMq);
+    else if (mq.addListener) mq.addListener(onMq);
+  }
+  if (s.debug) window.__cardFx = fxDebugApi();
+}
+
+/* 上下文懒建：不进卡片就不申请 GPU 资源，也不惊动 jsdom（那边 getContext 返回 null） */
+function fxEnsureGL() {
+  const s = fxState;
+  if (s.gl) return !s.gl.isContextLost();
+  if (s.failed || !s.canvas || typeof s.canvas.getContext !== 'function') return false;
+
+  let gl = null;
+  try {
+    gl = s.canvas.getContext('webgl', {
+      alpha: true, premultipliedAlpha: false, antialias: false,
+      depth: false, stencil: false, powerPreference: 'low-power',
+      preserveDrawingBuffer: !!s.debug,   // 只为测试开放：每帧多一次全画布拷贝
+    }) || s.canvas.getContext('experimental-webgl');
+  } catch (e) { gl = null; }
+  if (!gl) { s.failed = true; return false; }
+  if (gl.isContextLost()) return false;   // 等 webglcontextrestored
+
+  const sh = (type, src) => {
+    const o = gl.createShader(type);
+    gl.shaderSource(o, src);
+    gl.compileShader(o);
+    if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) { gl.deleteShader(o); return null; }
+    return o;
+  };
+  const vs = sh(gl.VERTEX_SHADER, FX_VS);
+  const fs = sh(gl.FRAGMENT_SHADER, FX_FS);
+  if (!vs || !fs) { s.failed = true; return false; }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { s.failed = true; return false; }
+
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'aPos');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  gl.disable(gl.DEPTH_TEST);
+
+  s.gl = gl;
+  s.prog = prog;
+  s.creates++;
+  s.u = {
+    uRes: gl.getUniformLocation(prog, 'uRes'),
+    uOrigin: gl.getUniformLocation(prog, 'uOrigin'),
+    uMaxDist: gl.getUniformLocation(prog, 'uMaxDist'),
+    uProg: gl.getUniformLocation(prog, 'uProg'),
+    uTime: gl.getUniformLocation(prog, 'uTime'),
+    uAmt: gl.getUniformLocation(prog, 'uAmt'),
+    uC0: gl.getUniformLocation(prog, 'uC0'),
+    uC1: gl.getUniformLocation(prog, 'uC1'),
+    uC2: gl.getUniformLocation(prog, 'uC2'),
+  };
+  s.canvas.addEventListener('webglcontextlost', ev => {
+    ev.preventDefault();          // 不拦默认行为，canvas 会永久留一块黑
+    fxPark();
+    s.gl = null;
+  }, false);
+  return true;
+}
+
+function fxColorsOf(card) {
+  const id = Number(card && card.dataset ? card.dataset.id : 0);
+  const list = (typeof data !== 'undefined' && data) ? data : [];
+  for (let i = 0; i < list.length; i++) {
+    if (Number(list[i].id) === id) return fxColors(list[i].color);
+  }
+  return fxColors('#888888');
+}
+
+function fxSize(r) {
+  const s = fxState;
+  const dpr = Math.min(window.devicePixelRatio || 1, FX_DPR_MAX);
+  const w = Math.max(1, Math.round(r.width * dpr));
+  const h = Math.max(1, Math.round(r.height * dpr));
+  /* 只在真的变了才写：写一次 = 重建后备缓冲，是这里唯一"贵"的操作。
+     同列卡片尺寸相同，横扫 20 张只发生 1–2 次分配。 */
+  if (s.canvas.width !== w || s.canvas.height !== h) {
+    s.canvas.width = w;
+    s.canvas.height = h;
+  }
+  s.w = w; s.h = h;
+}
+
+function fxPoint(ev, r, snap) {
+  const s = fxState;
+  if (ev && ev.clientX != null) { s.lastClientX = ev.clientX; s.lastClientY = ev.clientY; }
+  if (!r) {
+    if (!s.rect || s.rectScrollY !== window.scrollY) {
+      s.rect = s.swatch.getBoundingClientRect();
+      s.rectScrollY = window.scrollY;
+    }
+    r = s.rect;
+  }
+  const nx = Math.max(0, Math.min(1, (s.lastClientX - r.left) / Math.max(r.width, 1)));
+  const ny = Math.max(0, Math.min(1, (s.lastClientY - r.top) / Math.max(r.height, 1)));
+  s.tx = nx; s.ty = ny;
+  if (snap) { s.px = nx; s.py = ny; }
+}
+
+function fxEnter(card, ev, resume) {
+  const s = fxState;
+  if (!fxOk() || !card || s.frozen) return;
+  const sw = card.querySelector('.card-swatch');
+  if (!sw) return;
+  const r = sw.getBoundingClientRect();
+  if (r.width < 48 || r.height < 24) return;   // 视图被隐藏 / 卡片被压扁
+  if (!fxEnsureGL()) return;
+
+  const sameCard = s.card === card && s.swatch === sw;
+  const fromLeaving = sameCard && s.state === 'leaving';
+
+  s.card = card; s.swatch = sw; s.inside = true;
+  s.rect = r; s.rectScrollY = window.scrollY;
+  fxSize(r);
+  if (sw.firstChild !== s.canvas) sw.insertBefore(s.canvas, sw.firstChild);
+  s.colors = fxColorsOf(card);
+  fxPoint(ev, r, true);              // 进卡瞬间不平滑，否则坐标会从上一张卡飘过来
+  fxDraw(performance.now());         // 插入后同步画一帧：Safari/Firefox 首帧可能是空的
+
+  const now = performance.now();
+  if (resume === true) {
+    /* 重渲染后由 fxProbe 找回：续上满程，不重播开场（鼠标根本没动） */
+    s.progFrom = 1; s.progVal = 1; s.state = 'flowing';
+  } else {
+    /* 中途移回同一张卡：从当前进度接着涨；全新进入：从 0 漫开 */
+    s.progFrom = fromLeaving ? s.progVal : 0;
+    s.progVal = s.progFrom;
+    s.state = 'entering';
+  }
+  s.t0 = now; s.frames = 0; s.last = 0;
+  card.onpointermove = fxOnMove;     // 属性赋值：12.10 禁止 document 级 pointermove 监听
+  if (!s.raf) s.raf = requestAnimationFrame(fxFrame);
+}
+
+function fxLeave() {
+  const s = fxState;
+  if (s.state === 'idle' || s.state === 'leaving' || s.frozen) return;
+  s.state = 'leaving';
+  s.t0 = performance.now();
+  s.progFrom = s.progVal;
+  s.inside = false;
+  if (s.card && s.card.onpointermove === fxOnMove) s.card.onpointermove = null;
+  if (!s.raf) { s.last = 0; s.raf = requestAnimationFrame(fxFrame); }
+}
+
+function fxFrame(now) {
+  const s = fxState;
+  s.raf = 0;
+  if (s.frozen) return;
+  if (!s.swatch || !s.swatch.isConnected) { fxPark(); return; }
+
+  /* 每 15 帧确认一次还看得见：切视图 / 切页 / 筛选把卡片藏了都要停 */
+  if ((s.frames++ % 15) === 0) {
+    const r = s.swatch.getBoundingClientRect();
+    const vh = window.innerHeight || 800;
+    if (r.width < 8 || r.bottom < -240 || r.top > vh + 240) { fxPark(); return; }
+    s.rect = r; s.rectScrollY = window.scrollY;
+    fxSize(r);
+  }
+
+  const dt = s.last ? Math.min(64, now - s.last) : 16;
+  s.last = now;
+
+  if (s.state === 'entering') {
+    const t = Math.min(1, (now - s.t0) / FX_IN_MS);
+    s.progVal = s.progFrom + (1 - s.progFrom) * (1 - Math.pow(1 - t, 3));
+    if (t >= 1) { s.progVal = 1; s.state = 'flowing'; }
+  } else if (s.state === 'leaving') {
+    const t = Math.min(1, (now - s.t0) / FX_OUT_MS);
+    s.progVal = s.progFrom * Math.pow(1 - t, 1.6);
+    if (t >= 1) { fxPark(); return; }
+  }
+
+  /* 指针平滑用与帧率无关的指数趋近：60Hz 与 120Hz 手感一致 */
+  const k = 1 - Math.exp(-dt / 90);
+  s.px += (s.tx - s.px) * k;
+  s.py += (s.ty - s.py) * k;
+
+  fxDraw(now);
+  s.raf = requestAnimationFrame(fxFrame);
+}
+
+function fxDraw(now) {
+  const s = fxState, gl = s.gl;
+  if (!gl || gl.isContextLost()) return;
+  const w = s.w, h = s.h;
+  gl.viewport(0, 0, w, h);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  if (s.progVal <= 0.0005) return;
+
+  const ox = Math.max(0, Math.min(w, s.px * w));
+  const oy = Math.max(0, Math.min(h, (1 - s.py) * h));   // CSS 的 y 轴翻到 GL 的左下原点
+  const dx = w - ox, dy = h - oy;
+  const maxDist = Math.max(Math.hypot(ox, oy), Math.hypot(dx, oy),
+    Math.hypot(ox, dy), Math.hypot(dx, dy), 1);
+
+  const u = s.u, c = s.colors;
+  gl.useProgram(s.prog);
+  gl.uniform2f(u.uRes, w, h);
+  gl.uniform2f(u.uOrigin, ox, oy);
+  gl.uniform1f(u.uMaxDist, maxDist);
+  gl.uniform1f(u.uProg, s.progVal);
+  gl.uniform1f(u.uTime, (now - s.clock0) / 1000);
+  gl.uniform3fv(u.uC0, c.base);
+  gl.uniform3fv(u.uC1, c.hi);
+  gl.uniform3fv(u.uC2, c.lo);
+  gl.uniform1f(u.uAmt, FX_AMT);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+/* 唯一的回收口：停 rAF → 清监听 → canvas 回宿主。所有"不画了"的路径都走这里。
+   keep=true 表示这次收回是「重渲染把节点冲掉了」，不是用户离开 —— 下一帧若在同一张卡上
+   重新出现，要接着满程画，而不是从头再漫一遍（后台 renderAll 会让液体无端闪一次）。 */
+function fxPark(keep) {
+  const s = fxState;
+  const parkedId = s.card ? String(s.card.dataset.id) : null;
+  if (s.raf) { cancelAnimationFrame(s.raf); s.raf = 0; }
+  if (s.card && s.card.onpointermove === fxOnMove) s.card.onpointermove = null;
+  if (s.card) { s.lastId = s.card.dataset.id; s.lastAt = performance.now(); }
+  s.resumeId = keep ? parkedId : null;
+  s.state = 'idle'; s.progVal = 0; s.progFrom = 0;
+  s.card = null; s.swatch = null; s.frames = 0; s.last = 0; s.inside = false;
+  if (s.canvas && s.host && s.canvas.parentNode !== s.host) s.host.appendChild(s.canvas);
+}
+
+/* renderAll 末尾调用。20+ 条渲染路径（搜索防抖 6156、AMS 扣减 11005、切片撤销 11028…）
+   都会整段替换 innerHTML，这里是它们唯一的收敛点 —— 不用改任何调用方。
+   鼠标静止时不会再有 pointerover，所以必须自己用屏幕坐标把卡片找回来。 */
+function cardFxAfterRender() {
+  const s = fxState;
+  if (!s.canvas) return;
+  if (s.swatch && s.swatch.isConnected) {
+    s.rect = s.swatch.getBoundingClientRect();    // 砖墙重排会改卡宽
+    s.rectScrollY = window.scrollY;
+    fxSize(s.rect);
+    return;
+  }
+  const wasInside = s.inside;
+  fxPark(true);
+  if (wasInside && s.lastClientX >= 0) requestAnimationFrame(fxProbe);
+}
+
+function fxProbe() {
+  const s = fxState;
+  if (!fxOk() || s.state !== 'idle' || s.lastClientX < 0) return;
+  const el = document.elementFromPoint ? document.elementFromPoint(s.lastClientX, s.lastClientY) : null;
+  const card = el && el.closest ? el.closest('.filament-card') : null;
+  /* 重建后的元素是新的，sameCard 判断必然失败，所以显式 resume：续上满程，不重播开场 */
+  if (card) { s.resumeId = null; fxEnter(card, { clientX: s.lastClientX, clientY: s.lastClientY }, true); }
+}
+
+function fxOnOver(e) {
+  if (e.pointerType === 'touch') return;
+  const s = fxState;
+  const card = e.target && e.target.closest ? e.target.closest('.filament-card') : null;
+  if (!card) return;
+  if (s.card === card && (s.state === 'entering' || s.state === 'flowing')) return;  // 卡内移动
+  /* Chromium 在鼠标不动、底下 DOM 被换掉后也会补发 pointerover。这时要接着画，
+     不能因为「重新进卡」就从头漫一遍 —— 后台同步触发 renderAll 时会莫名闪一下。 */
+  const resume = s.resumeId != null && String(card.dataset.id) === s.resumeId;
+  s.resumeId = null;
+  fxEnter(card, e, resume);
+}
+
+function fxOnOut(e) {
+  const s = fxState;
+  if (!s.card) return;
+  const to = e.relatedTarget;
+  if (to && s.card.contains(to)) return;   // 移到卡内另一个元素，不算离开
+  fxLeave();                               // 移到卡身之外 / 移出窗口(relatedTarget=null)
+}
+
+function fxOnMove(e) { fxPoint(e, null, false); }
+
+function fxOnResize() {
+  const s = fxState;
+  if (!s.swatch || !s.swatch.isConnected) return;
+  s.rect = s.swatch.getBoundingClientRect();
+  s.rectScrollY = window.scrollY;
+  fxSize(s.rect);
+}
+
+function fxOnVis() { if (document.hidden) fxPark(); }
+
+/* 只在 ?cardfx=1 时挂载：给浏览器级验收留一个确定性探针（生产路径没有这些入口） */
+function fxDebugApi() {
+  const s = fxState;
+  const corner = (px, w, h, x, y) => px[(y * w + x) * 4 + 3];
+  return {
+    get canvas() { return s.canvas; },
+    get gl() { return s.gl; },
+    get state() { return s.state; },
+    get prog() { return s.progVal; },
+    get creates() { return s.creates; },
+    info() {
+      return {
+        state: s.state, prog: s.progVal, creates: s.creates,
+        parent: s.canvas && s.canvas.parentElement ? String(s.canvas.parentElement.className) : '',
+        cardId: s.card ? s.card.dataset.id : null,
+        canvasCount: document.querySelectorAll('canvas').length,
+      };
+    },
+    /* 冻结在指定进度并同步读回像素（同任务内 drawArrays 后 readPixels 是确定的） */
+    freeze(p) {
+      if (s.raf) { cancelAnimationFrame(s.raf); s.raf = 0; }
+      s.frozen = true;
+      s.progVal = p;
+      fxDraw(performance.now());
+      const gl = s.gl, w = s.w, h = s.h;
+      if (!gl || !w || !h || gl.isContextLost()) return null;
+      const px = new Uint8Array(w * h * 4);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      let sum = 0, max = 0;
+      const bins = new Set();
+      for (let i = 3; i < px.length; i += 4) {
+        const a = px[i];
+        sum += a;
+        if (a > max) max = a;
+        bins.add(a >> 2);
+      }
+      return {
+        w, h,
+        alphaMean: sum / (w * h) / 255,
+        alphaMax: max / 255,
+        bins: bins.size,
+        corners: [corner(px, w, h, 1, 1), corner(px, w, h, w - 2, 1),
+          corner(px, w, h, 1, h - 2), corner(px, w, h, w - 2, h - 2)],
+      };
+    },
+    thaw() { s.frozen = false; s.progVal = 1; s.state = 'flowing'; s.t0 = performance.now(); s.last = 0; if (!s.raf) s.raf = requestAnimationFrame(fxFrame); },
+    /* 冻住之后要能干净解开：detach 必须把 frozen 一起清掉，否则后续悬停全被挡住 */
+    detach() { s.frozen = false; fxPark(); },
+  };
+}
+
+window.cardFxOff = function () {
+  try { localStorage.setItem('fmCardFx', '0'); } catch (e) { /* 隐私模式 */ }
+  fxState.on = false;
+  fxPark();
+};
+window.cardFxOn = function () {
+  try { localStorage.removeItem('fmCardFx'); } catch (e) { /* 隐私模式 */ }
+  fxState.on = true;
+};
 
 /* ══════════════════════════════
    Render grid
@@ -5764,21 +6911,30 @@ function filamentCardHtml(d, i, delay) {
           <span class="card-brand">${esc(d.brand)}</span>
           <span class="card-material">${esc(d.material)}</span>
           ${d.bambuCode ? `<span style="font-size:0.65rem;color:var(--accent);font-family:var(--font-mono);background:var(--accent-dim);padding:1px 5px;border-radius:3px">#${esc(d.bambuCode)}</span>` : ''}
-          ${prnUsageOf(d) > 0 ? `<span class="card-usage" title="${esc(prnUsageTitle(d))}">90天 ${Math.round(prnUsageOf(d))}g${prnUsageIsManual(d) ? '<i style="opacity:.6;font-style:normal"> · 校准</i>' : ''}</span>` : ''}
           ${(n => n ? `<span class="finished-note${n.done ? ' done' : ''}">${esc(n.text)}</span>` : '')(finishedNote(d))}
+          ${(w => w ? `<span class="card-when" title="入库 ${esc(String(d.createdAt).slice(0, 16).replace('T', ' '))}">${esc(w)}</span>` : '')(sortIsTime() ? invDateLabel(d.createdAt) : '')}
         </div>
         ${d.tags && d.tags.length ? `<div class="card-tags">${d.tags.map(t => `<span class="tag-badge">${esc(t)}</span>`).join('')}</div>` : ''}
       </div>
+      ${(() => {
+        /* 底栏两个数字：库存总重 + 近 90 天消耗。
+           重量按「卷数 × 单卷规格」算 —— 单卷规格本身不显示，它进了 title，
+           因为规格是录入时的常量，而总重在每次增减卷数后都会变。 */
+        const kg = ((Number(d.weight) || 0) * (Number(d.qty) || 0)) / 1000;
+        const kgTxt = kg >= 10 ? kg.toFixed(1) : kg.toFixed(2).replace(/0$/, '');
+        const use = Math.round(prnUsageOf(d) || 0);
+        return `
       <div class="card-footer">
-        <div class="weight-display">
-          <span class="weight-num">${d.qty}</span>
-          <span class="weight-unit">×${d.weight}g</span>
+        <div class="cf-stat" title="库存 ${d.qty} 卷 × ${esc(String(d.weight))}g = ${kg.toFixed(2)} kg">
+          <span class="cf-k">库存</span>
+          <span class="cf-v">${kgTxt}<i>kg</i></span>
         </div>
-        <div class="spool-status ${d.hasSpool ? 'spool-yes' : 'spool-no'}">
-          <div class="spool-dot"></div>
-          ${d.hasSpool ? '有料盘' : '无料盘'}
+        <div class="cf-stat" title="${use > 0 ? esc(prnUsageTitle(d)) : '近 90 天没有打印消耗记录'}">
+          <span class="cf-k">90天</span>
+          <span class="cf-v${use > 0 ? '' : ' idle'}">${use > 0 ? `${use}<i>g</i>` : '—'}</span>
         </div>
-      </div>
+      </div>`;
+      })()}
     </div>
   `;
 }
@@ -5811,7 +6967,7 @@ function renderList(filtered) {
       </div>
       <div class="list-name-col">
         <div class="list-name">${esc(d.name)} ${d.bambuCode ? `<span style="font-size:0.65rem;color:var(--accent);font-family:var(--font-mono);background:var(--accent-dim);padding:1px 5px;border-radius:3px;vertical-align:middle">#${esc(d.bambuCode)}</span>` : ''}</div>
-        <div class="list-brand">${esc(d.brand)}</div>
+        <div class="list-brand">${esc(d.brand)}${(w => w ? `<span class="list-when" title="入库 ${esc(String(d.createdAt).slice(0, 16).replace('T', ' '))}">· ${esc(w)}</span>` : '')(sortIsTime() ? invDateLabel(d.createdAt) : '')}</div>
         ${d.tags && d.tags.length ? `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">${d.tags.map(t => `<span class="tag-badge list-tag">${esc(t)}</span>`).join('')}</div>` : ''}
       </div>
       <div class="list-material-badge">${esc(d.material)}</div>
@@ -5843,7 +6999,8 @@ function renderList(filtered) {
       + 实时色带），点标题在文档流内推开/收拢内容 —— 不浮层、不遮挡。
       内容默认「迷你卷」（一格一卷），点开锚定浮层看全部字段。
       组序固定按 SW_FAMILIES（色相轮），不受排序按钮影响 —— 它是索引，不是排行。
-      组内：sortMode==='usage' 时按近 90 天消耗降序，否则按色相 → 明度。 ──
+      组内：sortMode==='usage' 按近 90 天消耗降序；'new'/'old' 按入库时间；
+            其余按色相 → 明度。 ──
 ══════════════════════════════ */
 const FAM_UNSET = '未设色';
 const SW_FAM_IDX = SW_FAMILIES.reduce((m, f, i) => (m[f] = i, m), {});
@@ -5885,6 +7042,7 @@ function famGroups(filtered) {
     g.hexN = g.segs.size;
     /* 组内排序 */
     if (useUsage) g.items.sort((a, b) => (prnUsageOf(b) - prnUsageOf(a)) || byHue(a, b));
+    else if (sortIsTime()) g.items.sort(invTimeCmp);
     else g.items.sort(byHue);
     /* 马赛克竖条：始终按色相排序（它是调色板，不是卡片的顺序），
        q 是卷数，封面渲染时按 H = 30 + 70*(q/maxQ) 算高度，0 卷兜底 12%。 */
@@ -5906,34 +7064,15 @@ function famGroups(filtered) {
   return out;
 }
 
-/* ── 卡片墙的两档偏好（2026-10 重构） ──
-   famDensity 管「卡内一格长什么样」，famRows 管「每卡露几行」。
-   两者是**两套独立映射**，不要用一个「行数」同时喂：mini 是 2 列，
-   card 是 1 列且单卡本身就 206–270px 高，"4 行"在 card 下等于 4 张卡片 ≈ 900px。 */
-const FAM_CAP = {
-  mini: { compact: 4, default: 8 },   // 2 列 × 2 行 / 2 列 × 4 行
-  card: { compact: 1, default: 2 },   // 完整卡片封顶 2 张（3 张会到 810px，墙就散了）
-};
-/* 每卡渲染几条。**编辑模式一律不截断** —— toggleSelectAll 会选中全部条目，
-   若只渲染前 N 条，就会出现「计数 200、一格都没变色」的失败态
-   （updateItemVisual / updateAllVisuals 只遍历 DOM 里真实存在的 chip）。 */
-function famCap() {
-  if (editMode) return Infinity;
-  return FAM_CAP[famDensity][famRows === 'compact' ? 'compact' : 'default'];
-}
+/* ── 内容密度：'mini' 迷你卷（默认）| 'card' 完整卡片 ──
+   只管「砖内一格长什么样」，不再管露几行 —— 露几行这件事已经不存在了
+   （见 renderFam / packFamWall：砖身永远渲染全量）。 */
 function setFamDensity(v) {
   const d = famDensityOk(v);
   if (!d || d === famDensity) return;
   famDensity = d;
   lsSet(FAM_DENSITY_KEY, d);      // 非 SYNC 键：lsSet 只写本地，不会排 PUT
-  renderAll();                    // 两种密度的 markup 不同，必须重建
-}
-function setFamRows(v) {
-  const r = famRowsOk(v);
-  if (!r || r === famRows) return;
-  famRows = r;
-  lsSet(FAM_ROWS_KEY, r);         // 同上，非 SYNC 键
-  renderAll();                    // 截断条数变了，markup 也跟着变
+  renderAll();                    // 两种密度的 markup 不同，必须重建（重建末尾会重新打包）
 }
 
 /* ══════════════════════════════
@@ -5988,9 +7127,6 @@ function famRibbonHtml(g) {
   }).join('');
 }
 
-/* renderFam 最后一次的聚合结果，供 openFamPanel 反查（见 renderFam 里的赋值） */
-let famLastGroups = [];
-
 function renderFam(filtered) {
   const el = document.getElementById('famView');
   if (!el) return;
@@ -6003,12 +7139,6 @@ function renderFam(filtered) {
   const totHex = groups.reduce((s, g) => s + g.hexN, 0);
   const totG = groups.reduce((s, g) => s + g.grams, 0);
   const totKg = specKg(totG);
-  const cap = famCap();
-  const famName = fam => (fam === FAM_UNSET ? FAM_UNSET : fam + '色系');
-  const CARET = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
-  /* 面板要按 fam 反查同一份聚合，缓存下来避免每次开面板重跑 famGroups（含排序）。
-     renderFam 是唯一写入口，且 openFamPanel 要求 currentView==='fam'，缓存不会过期。 */
-  famLastGroups = groups;
 
   const bar = `<div class="fam-bar">
     <span class="folder-stats">
@@ -6026,157 +7156,182 @@ function renderFam(filtered) {
               data-famdens="card" aria-pressed="${famDensity === 'card'}"
               title="完整卡片：与网格视图同一套卡片"
               onclick="setFamDensity('card')">卡片</button>
-      <span class="fam-bar-sep" aria-hidden="true"></span>
-      <button type="button" class="folder-bar-btn${famRows === 'compact' ? ' on' : ''}"
-              data-famrows="compact" aria-pressed="${famRows === 'compact'}"
-              title="每卡少露几行，12 个色系扫得更快"
-              onclick="setFamRows('compact')">紧凑</button>
-      <button type="button" class="folder-bar-btn${famRows === 'default' ? ' on' : ''}"
-              data-famrows="default" aria-pressed="${famRows === 'default'}"
-              title="每卡多露几行，一眼看到更多耗材"
-              onclick="setFamRows('default')">标准</button>
     </span>
   </div>`;
 
+  /* 砖身**永远渲染全量** —— 没有 slice、没有「还有 N 卷」。
+     「卷多的砖更高」由 packFamWall 把它加宽到 2 列来消化，
+     而不是靠藏起一部分条目逼用户点开。 */
   const groupHtml = g => {
     const famColor = SW_FAM_COLOR[g.fam] || '#8892A0';
-    const shown = g.items.slice(0, cap);
-    /* 隐藏部分的**卷数之和**，不是记录条数 —— 一条记录 qty 可能是 5，
-       用 items.length 会严重低估。cap=Infinity 时 rest 恒 0，自然不渲染按钮
-       （不会出现「还有 0 卷」）。 */
-    const rest = g.items.slice(cap).reduce((s, d) => s + Math.max(0, Number(d.qty) || 0), 0);
+    const kg = specKg(g.grams);
+    /* 主名与「色系」后缀分开：后缀降成小号灰字，主名才抓得住眼睛。
+       文本拼起来仍是「红色系」，无障碍朗读与断言口径不变。
+       「未设色」本身就是完整说法，再挂「色系」会读成「未设色色系」。 */
+    const famLabel = g.fam === FAM_UNSET
+      ? `<span class="folder-name"><span class="fam-main">${esc(FAM_UNSET)}</span></span>`
+      : `<span class="folder-name"><span class="fam-main">${esc(g.fam)}</span><i class="fam-suffix">色系</i></span>`;
     /* 迷你密度完全不碰 filamentCardHtml —— 200 卷时这是省掉一整套卡片字符串 */
     const inner = famDensity === 'card'
-      ? shown.map((d, i) => filamentCardHtml(d, i, Math.min(i * 0.024, 0.6))).join('')
-      : shown.map(spoolChipHtml).join('');
-    return `<section class="fam-grp" data-fam="${esc(g.fam)}" style="--fam:${esc(famColor)}">
-      <h3 class="folder-h">
-        <button type="button" class="fam-hd" aria-expanded="false"
-                onclick="toggleFamPanel('${jsAttr(g.fam)}')">
-          <span class="fam-rail" aria-hidden="true"></span>
-          <span class="folder-name">${esc(famName(g.fam))}</span>
-          <span class="folder-meta"><span><b>${g.qty}</b> 卷</span>${g.low ? `<span class="fam-low">${g.low} 低</span>` : ''}</span>
-          <span class="fam-caret" aria-hidden="true">${CARET}</span>
-        </button>
+      ? g.items.map((d, i) => filamentCardHtml(d, i, Math.min(i * 0.024, 0.6))).join('')
+      : g.items.map(spoolChipHtml).join('');
+    return `<section class="fam-grp" data-fam="${esc(g.fam)}" data-span="1" style="--fam:${esc(famColor)}">
+      <h3 class="fam-hd">
+        <span class="fam-rail" aria-hidden="true"></span>
+        ${famLabel}
+        <span class="folder-meta"><span><b>${g.qty}</b> 卷</span><span class="fam-hex"><b>${g.hexN}</b> 色</span><span class="fam-kg"><b>${esc(kg.v)}</b>${esc(kg.u)}</span>${g.low ? `<span class="fam-low">${g.low} 低</span>` : ''}</span>
+        <span class="fam-ribbon" aria-hidden="true">${famRibbonHtml(g)}</span>
       </h3>
-      <div class="fam-body"><div class="fam-cards">${inner}</div></div>
-      ${rest > 0 ? `<button type="button" class="fam-more"
-          onclick="toggleFamPanel('${jsAttr(g.fam)}')">还有 ${rest} 卷</button>` : ''}
+      <div class="fam-cards">${inner}</div>
     </section>`;
   };
 
   el.innerHTML = bar + `<div class="fam-wall" id="famWall">${groups.map(groupHtml).join('')}</div>`;
+  /* 必须在 innerHTML 之后**同步**跑：此刻 DOM 已插入、#famView 已 visible，
+     能量到真实宽度。延到 rAF 会让用户先看到一帧竖排错位。 */
+  packFamWall();
 }
 
 /* ══════════════════════════════
-   行内展开面板（#famPanel）
-   ── 点一张卡 → 在**该卡所在行的下一行行首**插入一个整行宽的面板，把这一组摊开。
-      其他卡片只被整体下推，一张都不重排。
+   色系墙打包（masonry）
+   ── 每块砖先按 1 列宽量高，高宽比超上限就加宽到 2 列，再逐块落到「top + 空洞最小」的位置。
+      目标就两条：**不截断**（砖身永远全量）、**不留洞**（砖与砖之间没有空档，
+      参差只留在最后一排的底边 —— 这是瀑布流的固有形状，不是缺陷）。
 
-   为什么不用 grid-column:1/-1 直接铺在卡上：auto-placement 会把非行首的卡
-   挤到下一行行首 —— 卡片从第 2 列"飞走"、周围全部重排，用户会迷失。
-   为什么不用纵向撑开：同排其他 3 张卡只有 218px，撑开的卡旁边会留一大片空白。
+   为什么不用 CSS grid：
+     · 行高由同排最高的砖决定，矮砖下方必留一大块空洞（旧版靠 align-items:stretch
+       强行拉齐，结果内容少的卡底下全是白）；
+     · grid-column: span 2 会让非行首的砖被 auto-placement 挤到下一行行首 —— 砖"飞走"、
+       周围全部重排，用户会迷失方向。
+   绝对定位 + 自己算列高，才能真正做到「砖按内容长短自由排」。
 
-   插入点判定用 offsetTop 而不是 getBoundingClientRect：卡片有 @keyframes fadeIn
-   带 translateY(6px) 且 delay 各异（0.024s/张），rect 含 transform，渲染后 0.6s 内
-   同行卡的 top 能差 6px。offsetTop 不受 transform / 滚动影响，且同一行在 grid
-   布局下严格相等 —— 用 > 比较天然就是「下一行第一个」，最后一行则 append。
-   整个判定只读 offsetTop、写一次 insertBefore，位置不依赖面板自身高度，
-   因此不存在「插入 → 变高 → 重新定位」的循环。**禁止给面板挂 ResizeObserver。**
+   三个必须遵守的顺序，错了就量错：
+     ① 先写 width 再读 offsetHeight（宽度决定格子列数，也就决定了高度）；
+     ② 量完所有砖再统一定位（否则前面砖的 top 变化会污染后面砖的测量）；
+     ③ 位置全部写进才加 .is-packed（此前砖走普通文档流，脚本挂了也只是退化成竖排）。
    ── */
-function famPanelEl() { return document.getElementById('famPanel'); }
+const FAM_GAP = 14;          // 与 CSS 里的列间距一致（绝对定位后靠它算左缘）
+const FAM_MIN_COL = 292;     // 单列最小宽度：与旧 grid 的 minmax 下限同值
+const FAM_SPAN_LIMIT = 2;    // 最多加宽到 2 列：再宽就和「砖墙」的节奏脱节了
+/* 高宽比上限：超过就把砖加宽一档。
+   目前只有 mini 用得上 —— 卡片密度一律不加宽（见 maxSpan 的注释：砖宽一变卡宽就变）。
+   card 那一档留着，是因为将来若要「卡片也横放」，判据还得从这儿取。 */
+const FAM_ASPECT = { mini: 1.6, card: 2.0 };
+/* 跨列落位允许留下的最大空洞（px）。40 ≈ 三个砖缝，视觉上就是一条窄缝；
+   超过这个数的候选一律不选（除非整面墙都找不到更平的落点）。 */
+const FAM_HOLE_TOL = 40;
 
-function closeFamPanel(opts) {
-  const panel = famPanelEl();
-  /* 面板里的 chip 可能是 #spoolPop 的锚点，先收掉，否则浮层会悬在空处 */
-  const pop = document.getElementById('spoolPop');
-  if (pop && !pop.hidden && panel && pop._anchor && panel.contains(pop._anchor)) closeSpoolPop();
+function famSpanW(colW, span) { return colW * span + FAM_GAP * (span - 1); }
 
-  let hd = null;
+function packFamWall() {
   const wall = document.getElementById('famWall');
-  if (wall) {
-    wall.querySelectorAll('.fam-grp.is-expanded').forEach(g => {
-      g.classList.remove('is-expanded');
-      const b = g.querySelector('.fam-hd');
-      if (b) {
-        hd = b;
-        b.setAttribute('aria-expanded', 'false');
-        b.removeAttribute('aria-controls');
-      }
-      const body = g.querySelector('.fam-body');
-      if (body) body.removeAttribute('hidden');
-    });
-  }
-  if (panel) panel.remove();
-  /* 面板被 remove() 之后焦点会掉回 body —— 必须显式还回标题行，
-     否则键盘用户按 Esc 之后完全不知道自己落在哪。 */
-  if (opts && opts.focus && hd && hd.isConnected) hd.focus({ preventScroll: true });
-}
-
-function famPanelHtml(g) {
-  const famColor = SW_FAM_COLOR[g.fam] || '#8892A0';
-  const name = (g.fam === FAM_UNSET ? FAM_UNSET : g.fam + '色系');
-  const kg = specKg(g.grams);
-  /* 面板里一律渲染全量：它存在的意义就是「把被截断的看完」 */
-  const inner = famDensity === 'card'
-    ? g.items.map((d, i) => filamentCardHtml(d, i, 0)).join('')
-    : g.items.map(spoolChipHtml).join('');
-  return `<div class="fam-panel-hd">
-      <span class="fam-rail" aria-hidden="true" style="background:${esc(famColor)}"></span>
-      <span class="folder-name" id="famPanelName">${esc(name)}</span>
-      <span class="folder-meta"><span><b>${g.qty}</b> 卷</span><span><b>${g.hexN}</b> 色</span><span><b>${esc(kg.v)}</b>${esc(kg.u)}</span>${g.low ? `<span class="fam-low">${g.low} 低</span>` : ''}</span>
-      <span class="fam-ribbon" aria-hidden="true">${famRibbonHtml(g)}</span>
-      <button type="button" class="fam-panel-btn" onclick="closeFamPanel({focus:true})">收起</button>
-    </div>
-    <div class="fam-cards">${inner}</div>`;
-}
-
-function openFamPanel(fam) {
-  const wall = document.getElementById('famWall');
-  if (!wall || currentView !== 'fam') return;
+  if (!wall) return;
   const cards = [...wall.children].filter(el => el.classList.contains('fam-grp'));
-  const card = cards.find(el => el.dataset.fam === fam);
-  const g = famLastGroups.find(x => x.fam === fam);
-  if (!card || !g) return;
+  if (!cards.length) return;
+  const W = wall.clientWidth;
+  /* 视图隐藏（display:none）时测不出宽度。renderFam 只在 currentView==='fam' 时跑，
+     而 applyView 已经先加了 .visible，所以正常情况下 W 一定是真实值。 */
+  if (W < 60) return;
 
-  closeFamPanel();     // 换卡：先收旧的（它内部会处理 #spoolPop 孤儿）
+  const cols = Math.max(1, Math.min(4, Math.floor((W + FAM_GAP) / (FAM_MIN_COL + FAM_GAP))));
+  const colW = (W - FAM_GAP * (cols - 1)) / cols;
+  /* 加宽只在「迷你」密度、且 3 列以上时允许：
+     · 卡片密度里卡片是按砖宽「填满」的，砖一宽卡就变宽 —— 同一面墙上 228px 与 338px
+       的卡并排，就是用户说的「太乱」。卡片密度一律 1 列，卡宽因此永远一致；
+       代价是卷多的色系只能往下长（高矮不齐可以接受，宽窄不齐不行）。
+     · 迷你格子是小方块，加宽只是「2 列变 4 列」，格子尺寸不变，可以放心用。
+     · 2 列时加宽 = 独占整行，砖墙会退化成一条条横幅；横砖还得等两列齐平才能落位，
+       等于把瀑布流压回堆叠。1 列更没得谈。 */
+  const maxSpan = (famDensity !== 'card' && cols >= 3) ? Math.min(cols, FAM_SPAN_LIMIT) : 1;
+  const limit = FAM_ASPECT[famDensity === 'card' ? 'card' : 'mini'];
 
-  /* 1) 内容先建好但不插入 —— 所有测量必须在写 DOM 之前完成，避免 layout thrash */
-  const panel = document.createElement('section');
-  panel.id = 'famPanel';
-  panel.className = 'fam-panel';
-  panel.dataset.fam = fam;
-  panel.setAttribute('role', 'region');
-  panel.setAttribute('aria-labelledby', 'famPanelName');
-  panel.tabIndex = -1;
-  panel.innerHTML = famPanelHtml(g);
+  /* ① 定宽 + 量高：同时记下「1 列宽时的高度」h1 —— 后面要用它判断
+        「竖着放会不会把墙顶得更高」。 */
+  const info = cards.map(c => {
+    let span = 1, hS = 0, h1 = 0;
+    for (; span <= maxSpan; span++) {
+      const w = famSpanW(colW, span);
+      c.style.width = w + 'px';
+      const h = c.offsetHeight;
+      if (span === 1) h1 = h;
+      hS = h;
+      if (h <= w * limit) break;
+    }
+    span = Math.min(span, maxSpan);
+    c.dataset.span = String(span);          // CSS 靠它决定砖头里要不要显示色带/克重
+    c.style.width = famSpanW(colW, span) + 'px';
+    return { c, span, h1, hS };
+  });
 
-  /* 2) 「被点卡所在行的下一行第一个卡」。同一行 offsetTop 严格相等，用 > 即得下一行 */
-  const topOf = el => Math.round(el.offsetTop);
-  const rowTop = topOf(card);
-  const below = cards.find(el => topOf(el) > rowTop);
-  wall.insertBefore(panel, below || null);
+  /* ② 落位。两个判据缺一不可：
+        · 位置分 = top + 空洞 —— 横砖压在两条高低不齐的列上时，矮的那列会空出
+          (top - colH) 的空洞（旧做法只看 top 最小，实测空出过 460px，比砖还高）；
+        · 降级判据：若这个落点必然留洞，而**竖着放不会把墙顶得更高**，就竖着放。
+          这条专治「把所有横砖都叠在同一对列上」——那会把墙拉高一倍，
+          右半边留出一大片空白，比原来的洞更难看。 */
+  const colH = new Array(cols).fill(0);
+  const bestSpot = span => {
+    let best = null;
+    for (let i = 0; i + span <= cols; i++) {
+      let top = 0, low = Infinity;
+      for (let j = i; j < i + span; j++) {
+        if (colH[j] > top) top = colH[j];
+        if (colH[j] < low) low = colH[j];
+      }
+      const hole = (top - low) * span;
+      const score = top + hole;
+      if (!best || score < best.score - 0.5) best = { at: i, top, hole, score };
+    }
+    return best;
+  };
+  info.forEach(it => {
+    let span = it.span, h = it.hS;
+    let spot = bestSpot(span);
+    if (span > 1 && spot.hole > FAM_HOLE_TOL) {
+      const narrow = bestSpot(1);
+      if (narrow.top + it.h1 <= spot.top + it.hS + 1) {
+        span = 1; h = it.h1; spot = narrow;
+        it.c.dataset.span = '1';
+        it.c.style.width = famSpanW(colW, 1) + 'px';
+      }
+    }
+    it.c.style.left = (spot.at * (colW + FAM_GAP)) + 'px';
+    it.c.style.top = spot.top + 'px';
+    for (let j = spot.at; j < spot.at + span; j++) colH[j] = spot.top + h + FAM_GAP;
+  });
 
-  /* 3) 卡片收成一条横条：内容已经在下方面板里了，留一个空框只会碍眼 */
-  card.classList.add('is-expanded');
-  const hd = card.querySelector('.fam-hd');
-  if (hd) {
-    hd.setAttribute('aria-expanded', 'true');
-    hd.setAttribute('aria-controls', 'famPanel');
-  }
-  const body = card.querySelector('.fam-body');
-  if (body) body.setAttribute('hidden', '');
-
-  /* 4) 焦点必须程序化转移：面板在「下一行」，4 列时 DOM 上隔了 3 张卡，
-        键盘用户按 Tab 根本走不到它。 */
-  panel.focus({ preventScroll: true });
-  if (panel.scrollIntoView) panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  /* ③ 墙高 = 最高列；减掉最后一段 gap，否则底部会多出 14px 空白 */
+  wall.style.height = (Math.max.apply(null, colH) - FAM_GAP) + 'px';
+  wall.classList.add('is-packed');
 }
 
-function toggleFamPanel(fam) {
-  const panel = famPanelEl();
-  if (panel && panel.dataset.fam === fam) { closeFamPanel({ focus: true }); return; }
-  openFamPanel(fam);
+/* 窗口宽度变化 → 重新打包。用 rAF 合并连续 resize（拖窗口时每秒几十次事件，
+   每次都重排 12 块砖的布局会让拖动明显发涩）。 */
+let famPackRaf = 0;
+function scheduleFamPack() {
+  if (famPackRaf) return;
+  famPackRaf = requestAnimationFrame(() => {
+    famPackRaf = 0;
+    if (currentView === 'fam') packFamWall();
+  });
+}
+window.addEventListener('resize', scheduleFamPack, { passive: true });
+/* 字体晚到会让 chip 里的行高变一点点 → 高度变了位置就不准，补一次 */
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => { if (currentView === 'fam') packFamWall(); }).catch(() => {});
+}
+
+/* 统计页「点色系跳库存」的落点：一次族色描边脉冲。
+   去重 → 读 offsetWidth 强制重排 → 重挂 class，连点同一个色系也能再闪一次。 */
+function famFlash(fam) {
+  const wall = document.getElementById('famWall');
+  if (!wall) return;
+  const card = [...wall.children].find(el => el.dataset && el.dataset.fam === fam);
+  if (!card) return;
+  card.classList.remove('is-hit');
+  void card.offsetWidth;
+  card.classList.add('is-hit');
+  setTimeout(() => card.classList.remove('is-hit'), 1400);
 }
 
 /* ══════════════════════════════
@@ -6299,17 +7454,20 @@ function openSpoolPop(id, chip) {
 
 /* ══════════════════════════════
    Render all
+   ── 开头先 closeSpoolPop()：浮层锚点是 #famView 里的按钮，重建会把它们全换掉，
+      不先关就成了「点完详情、界面自己重建、浮层还悬在半空」的孤儿。
+      放这里能一次覆盖 20+ 调用点，含三条用户没操作的异步路径
+      （搜索防抖 / 切页后的 prnUsageSync→prnSlicedSweep / AMS 轮询）。
+   ── keepY：重建前记住滚动位置。下面这串 render 会清空 #famView / #gridView
+      的 innerHTML，页面在那一瞬间塌成几百像素高，浏览器立刻把 scrollY 夹到 0，
+      之后再也回不来 —— 表现是「勾选一张卡片，页面自己跳回顶部」，70 条时能跳掉一屏。
+      批量操作条做成吸底就是为了「选中第 50 卷时还能看见批量按钮」，
+      勾一下就跳顶的话，那条吸底就白做了。
 ══════════════════════════════ */
 function renderAll() {
-  /* 浮层锚点是 #famView 里的按钮，而下面这一串 render 会把它们全换掉 ——
-     变成孤儿浮层就是「点完详情、界面自己重建、浮层还悬在半空」。
-     放在这里能一次覆盖 20+ 个调用点，包括三条用户没操作的异步路径：
-     搜索防抖(onSearchInput)、切页后的 prnUsageSync→prnSlicedSweep、AMS 轮询。 */
   closeSpoolPop();
-  /* 面板同理：它挂在 #famWall 里，wall 一重建锚点就废了。放在这里一次覆盖 20+ 个
-     调用点，包括三条用户没操作的异步路径（搜索防抖 / prnSlicedSweep / AMS 轮询）。 */
-  closeFamPanel();
   prnUsageMapReset();          // 用量聚合缓存失效（data/用量变化的唯一收敛入口）
+  const keepY = window.pageYOffset || document.documentElement.scrollTop || 0;
   renderStats();
   renderBrandFilters();
   renderMaterialFilters();
@@ -6331,20 +7489,38 @@ function renderAll() {
   document.getElementById('filterFinished').classList.toggle('active', statusFilter==='finished');
 
   // sync 排序 / 用量筛选按钮
-  document.getElementById('sortDefaultBtn').classList.toggle('active', sortMode !== 'usage');
+  document.getElementById('sortDefaultBtn').classList.toggle('active', sortMode === 'default');
+  document.getElementById('sortTimeBtn').classList.toggle('active', sortIsTime());
+  document.getElementById('sortTimeBtn').textContent = sortMode === 'old' ? '入库 旧→新' : '入库 新→旧';
   document.getElementById('sortUsageBtn').classList.toggle('active', sortMode === 'usage');
   document.getElementById('filterAmsBtn').classList.toggle('active', amsFilter);
   document.getElementById('filterUsageBtn').classList.toggle('active', usedFilter);
 
+  /* 抽屉徽标：只在抽屉里真有生效条件时才亮 */
+  refreshFilterDrawer();
+
+  /* 清理用完按钮现在在「数据管理 · 危险操作」里（不在筛选行），
+     但文案里的条数得随时跟上 —— 它是最直接的「该收拾了」信号。 */
   const cfBtn = document.getElementById('clearFinishedBtn');
   if (cfBtn) {
     const n = data.filter(d => d.qty <= 0).length;
     cfBtn.disabled = n === 0;
-    cfBtn.textContent = n ? `清理用完 (${n})` : '清理用完';
+    cfBtn.textContent = n ? `清理用完的记录 (${n})` : '清理用完的记录';
   }
 
   if (editMode) updateBatchBar();
   cfSyncPanelSelection();
+
+  /* 把被夹掉的滚动位置补回来。只在「确实变小」时补：
+     筛选后结果变少、页面本来就该变短时，scrollTo 会被浏览器再夹一次，无害；
+     而页面变长（数据增加）则完全不动，不会莫名其妙把人往上推。 */
+  if (keepY > 0 && (window.pageYOffset || 0) < keepY - 1) {
+    window.scrollTo(0, keepY);
+    paintPinned();
+  }
+
+  /* 卡片被整段替换后把洪水 canvas 收回来（鼠标不动时不会再有 pointerover） */
+  cardFxAfterRender();
 }
 
 /* ══════════════════════════════
@@ -6363,6 +7539,9 @@ function toggleEditMode() {
   /* 折叠视图不是 .filament-grid：edit-mode 得自己挂一份，卡片上的编辑/删除才会跟着显隐 */
   document.getElementById('famView').classList.toggle('edit-mode', editMode);
   document.getElementById('batchBar').classList.toggle('visible', editMode);
+  /* batch-on 有两个作用：给 main 垫底部内边距（否则最后一排永远压在批量条底下），
+     以及把右下角的回到顶部按钮抬高让位。 */
+  document.body.classList.toggle('batch-on', editMode);
   updateBatchBar();
   renderAll();
 }
@@ -7307,6 +8486,145 @@ function buildPresetColors() {
 }
 
 /* ══════════════════════════════
+   吸顶栈 + 回到顶部
+══════════════════════════════ */
+
+/* header / 页签的高度只能实测，不能写死：≤720px 时 header 的按钮组会换成
+   4 列网格、整条 header 从 60px 涨到 ~110px，写死的 top 会让页签钻到它底下。 */
+function paintChrome() {
+  const h = document.querySelector('header');
+  const t = document.querySelector('.page-tabs');
+  const root = document.documentElement;
+  if (h) root.style.setProperty('--chrome-h', h.getBoundingClientRect().height.toFixed(1) + 'px');
+  if (t) root.style.setProperty('--tabs-h', t.getBoundingClientRect().height.toFixed(1) + 'px');
+}
+
+/* ── 紧凑态的状态量 ──
+   PIN_TIGHT_ON：进入紧凑态的阈值（120px 是「统计卡刚被页签吃掉」的位置，
+   再早切换会让人觉得数字在闪）。
+   pinTight：上一次的判定结果，迟滞的另一半（见下面 off 的注释）。
+   pinDelta：「紧凑 ↔ 展开」实测出来的高度差，退出阈值必须跨过它。
+   pinFreeze：回顶动画期间把紧凑态冻住（true/false），null 表示按 y 自动判定。 */
+const PIN_TIGHT_ON = 120;
+let pinTight = false;
+let pinDelta = 72;
+let pinFreeze = null;
+/* 解冻的出口：落地（下面按 y 判）+ 滚动真的停了（scrollend，兜住「滚到 1px 就停」）
+   + 用户自己动了手（滚轮 / 触屏 / 键盘打断平滑滚动）。缺一个就会卡在紧凑态。 */
+const PIN_FREEZE_OFF_EVENTS = ['scrollend', 'wheel', 'touchstart', 'keydown'];
+
+/* 紧凑态 / 分层阴影 / 回到顶部按钮，一次 scroll 里全算完。
+   用 rAF 合并：滚轮扫一下能触发几十个 scroll，每个都读 getBoundingClientRect
+   会让滚动明显发涩。 */
+let pinnedRaf = 0;
+function paintPinned() {
+  pinnedRaf = 0;
+  const y = window.pageYOffset || document.documentElement.scrollTop || 0;
+
+  /* 冻结期间只认 y：落到顶部（y<=1）就解冻，让「展开」发生在静止的顶部而不是滚动途中。
+     事件那几个出口在 pinUnfreeze 里摘。 */
+  let landed = false;
+  if (pinFreeze !== null && y <= 1) { pinUnfreeze(); landed = true; }
+
+  let tight;
+  if (pinFreeze !== null) {
+    tight = pinFreeze;
+  } else {
+    /* 迟滞：进 120 / 出 (120 - 高度差 - 16)。
+       为什么不能只用一个阈值 —— 紧凑态把 .pinned 从 ~155px 压到 ~90px，
+       而它横在滚动锚点上方：高度一变，浏览器为了「视觉不跳」就把 scrollY
+       反向补偿回去（实测 118 → 168），判定于是又翻回紧凑态，在 120 附近
+       反复横跳。表现就是回到顶部时页面在最后 200px 里连闪两三下。
+       退出阈值比进入阈值低出一个高度差，补偿后的位置才落不回进入区。 */
+    const off = Math.max(0, PIN_TIGHT_ON - pinDelta - 16);
+    tight = pinTight ? y > off : y > PIN_TIGHT_ON;
+  }
+
+  /* 翻转时量一次高度差留作迟滞宽度。取见过的最大值：估小了就还会抖，
+     估大一点只是让展开更贴近顶部，无害。 */
+  const act = document.querySelector('.page.active .pinned');
+  if (tight !== pinTight && act) {
+    const h0 = act.getBoundingClientRect().height;
+    act.classList.toggle('is-tight', tight);
+    const h1 = act.getBoundingClientRect().height;
+    if (h0 && h1) pinDelta = Math.min(220, Math.max(pinDelta, Math.abs(h1 - h0)));
+  }
+  pinTight = tight;
+
+  document.querySelectorAll('.pinned').forEach(el => {
+    if (el.classList.contains('is-tight') !== tight) el.classList.toggle('is-tight', tight);
+    /* 窄屏 .pinned 是 static，computed top 为 auto —— 那种情况下没有「吸住」这回事 */
+    const raw = getComputedStyle(el).top;
+    const stick = raw === 'auto' ? null : parseFloat(raw);
+    const stuck = stick !== null && tight && el.getBoundingClientRect().top <= stick + 0.6;
+    if (el.classList.contains('is-stuck') !== stuck) el.classList.toggle('is-stuck', stuck);
+  });
+  /* 落地这一下必须把位置钉回 0：展开紧凑态会把下面所有内容推下 ~65px，而浏览器的
+     滚动锚定为了「视觉不跳」顺势把 scrollY 顶回去 —— 结果「回到顶部」停在离顶 65px
+     的地方，看着像没回干净。锚定是同一帧里算的，改完类立刻写 0 才盖得住。 */
+  if (landed) window.scrollTo(0, 0);
+  const btn = document.getElementById('toTop');
+  /* 320px ≈ 小半屏。原来写 480，在「一屏半」这种不长不短的页面上永远够不到，
+     按钮等于没做 —— 而那种页面恰恰最需要一个回顶。 */
+  if (btn) btn.classList.toggle('show', y > 320);
+}
+function schedulePinned() {
+  if (pinnedRaf) return;
+  pinnedRaf = requestAnimationFrame(paintPinned);
+}
+/* 解冻：摘掉打断监听再补一次重算。落地时由 paintPinned 自己调用。 */
+function pinUnfreeze() {
+  pinFreeze = null;
+  PIN_FREEZE_OFF_EVENTS.forEach(t => window.removeEventListener(t, pinUnfreeze, true));
+  schedulePinned();
+}
+
+/* 吸顶工作台的实际高度，写进 --pinned-h。
+   色卡库的分组标题要贴在它下沿，而这个高度不是常数：色卡库多一条「已选筛选」胶囊，
+   统计页的控制条是两行 —— 写死 46px 会让组标题压住半行内容，或者露出底下滚过去的卡片。
+   窄屏 .pinned 是 static，没有「下沿」可言，写 0 让组标题直接贴页签。 */
+function paintPinnedH() {
+  const el = document.querySelector('.page.active .pinned');
+  const h = el && getComputedStyle(el).position === 'sticky'
+    ? el.getBoundingClientRect().height : 0;
+  document.documentElement.style.setProperty('--pinned-h', h.toFixed(1) + 'px');
+}
+
+/* 回到顶部。平滑滚动要能被系统「减少动态效果」关掉 —— 前庭功能敏感的人
+   被一屏 3000px 的高速滚动甩一下是真的会难受。 */
+function jumpTop() {
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* 冻住当前紧凑态：平滑滚动要从几千像素一路穿过 120 这条阈值，而切换紧凑态
+     会改 .pinned 的高度 —— 半路翻一次就是一次 65px 的内容跳变，也就是用户说的「闪」。
+     冻到落地（paintPinned 里 y<=1）再解冻，「展开」就发生在已经静止的顶部。 */
+  pinFreeze = pinTight;
+  PIN_FREEZE_OFF_EVENTS.forEach(t => {
+    window.removeEventListener(t, pinUnfreeze, true);
+    window.addEventListener(t, pinUnfreeze, { passive: true, capture: true });
+  });
+  window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+  /* 焦点跟着回顶部：按钮滚走后会把焦点丢给 body，键盘用户得从头 Tab 一遍 */
+  const main = document.getElementById('main');
+  if (main) main.focus({ preventScroll: true });
+}
+
+window.addEventListener('scroll', schedulePinned, { passive: true });
+window.addEventListener('resize', () => { paintChrome(); paintPinnedH(); schedulePinned(); }, { passive: true });
+/* resize 抓不到「header 因为换行而变高」这类变化（窗口没动，内容重排了），
+   ResizeObserver 才抓得到。观察的是 header / 页签本身，写的是别人的 top —— 不会自激。 */
+if (window.ResizeObserver) {
+  const ro = new ResizeObserver(() => { paintChrome(); schedulePinned(); });
+  const h0 = document.querySelector('header');
+  const t0 = document.querySelector('.page-tabs');
+  if (h0) ro.observe(h0);
+  if (t0) ro.observe(t0);
+  /* 吸顶工作台高度：色卡库的筛选胶囊条一出现，pinned 就长高一倍。
+     观察的是 pinned 自身、写的是 root 上的 --pinned-h，不会自激。 */
+  const roPin = new ResizeObserver(() => paintPinnedH());
+  document.querySelectorAll('.pinned').forEach(p => roPin.observe(p));
+}
+
+/* ══════════════════════════════
    Init
 ══════════════════════════════ */
 buildPresetColors();
@@ -7318,6 +8636,10 @@ applyView(currentView);
 applyTheme(fmPrefRaw(THEME_KEY) || (fmPrefRaw('fmSpecTheme') === 'paper' ? 'light' : null));
 try { if (fmPrefRaw('fmSpecTheme') != null) localStorage.removeItem('fmSpecTheme'); } catch (e) {}
 renderAll();
+/* 第一次布局完成后量一次吸顶高度，并同步一次吸顶状态（刷新时可能停在半页） */
+paintChrome();
+paintPinnedH();
+paintPinned();
 /* 启动即探测本地 printer-agent 服务（异步、不阻塞首屏；失败只置离线标志） */
 prnProbe();
 
@@ -7541,6 +8863,13 @@ function getSwList() {
 }
 
 /* ---------- 渲染 ---------- */
+/* 每组默认摊开这么多张。12 张在 1440px 下正好两行，一个色系的「长相」扫一眼就够；
+   再多就该用户自己决定要不要看 —— 692 张一次铺开是 30227px，38 屏。 */
+const SW_GROUP_PREVIEW = 12;
+/* 已手动展开的色系列（局部状态，不进 localStorage：这是一次浏览过程中的临时决定） */
+const swGroupOpen = new Set();
+const SW_FAM_ORDER = Object.keys(SW_FAM_COLOR);
+
 function renderSwatches() {
   swList = getSwList();
   const box = document.getElementById('swResults');
@@ -7548,16 +8877,62 @@ function renderSwatches() {
   document.getElementById('swCount').innerHTML =
     `共 <b>${swList.length}</b> 个颜色` + (swList.length !== swAll.length ? ` · 总库 ${swAll.length}` : '');
 
-  box.className = swViewMode === 'grid' ? 'sw-grid' : 'sw-list';
-  box.innerHTML = swList.map((it, i) => swViewMode === 'grid' ? swCardHtml(it, i) : swRowHtml(it, i)).join('');
+  if (swViewMode === 'grid') {
+    /* 网格视图按色系分组。列表视图保持扁平等宽 —— 它每一行已经写了来源和色系，
+       再套一层分组标题反而把 40 行拆成一堆碎片。 */
+    box.className = 'sw-groups';
+    box.innerHTML = swGroupsHtml();
+  } else {
+    box.className = 'sw-list';
+    box.innerHTML = swList.map((it, i) => swRowHtml(it, i)).join('');
+  }
   renderSwActiveBar();
 }
 
-function swCardHtml(it, i) {
+function swGroupsHtml() {
+  const buckets = new Map();
+  swList.forEach((it, i) => {
+    const f = swFamily(it.hex);
+    if (!buckets.has(f)) buckets.set(f, []);
+    buckets.get(f).push([it, i]);
+  });
+  /* 固定按色相顺序排，不按出现顺序：换排序方式时组的位置不该整体乱跳 */
+  const fams = [...buckets.keys()].sort((a, b) => SW_FAM_ORDER.indexOf(a) - SW_FAM_ORDER.indexOf(b));
+  /* 搜索时全部展开：用户已经在缩小范围了，再藏 74 个等于让他多点一次。
+     只有一个组且不超过预览量时也不画组头 —— 搜「朱红」时头顶挂个「红系 1」纯噪音。 */
+  const forceOpen = swKeyword.length > 0;
+  return fams.map(f => swGroupHtml(f, buckets.get(f), forceOpen, fams.length === 1 && swList.length <= SW_GROUP_PREVIEW)).join('');
+}
+
+function swGroupHtml(fam, items, forceOpen, noHead) {
+  const open = forceOpen || swGroupOpen.has(fam) || items.length <= SW_GROUP_PREVIEW;
+  const shown = open ? items : items.slice(0, SW_GROUP_PREVIEW);
+  const cards = shown.map(([it, i], k) => swCardHtml(it, i, k)).join('');
+  const head = noHead ? '' : `<div class="sw-group-hd">
+      <span class="sw-group-dot" style="background:${SW_FAM_COLOR[fam] || 'var(--border-hi)'}"></span>
+      <span class="sw-group-name">${fam}系</span>
+      <span class="sw-group-n">${items.length}</span>
+      <span class="sw-group-sp"></span>
+      ${items.length > SW_GROUP_PREVIEW
+        ? `<button class="sw-group-more" onclick="swToggleGroup('${fam}')">${open ? '收起' : `展开其余 ${items.length - SW_GROUP_PREVIEW} 个`}</button>`
+        : ''}
+    </div>`;
+  return `<section class="sw-group" data-fam="${fam}">${head}<div class="sw-grid">${cards}</div></section>`;
+}
+
+function swToggleGroup(fam) {
+  if (swGroupOpen.has(fam)) swGroupOpen.delete(fam); else swGroupOpen.add(fam);
+  renderSwatches();
+}
+
+function swCardHtml(it, i, k) {
   const zh = swEsc(it.zh), en = swEsc(it.en);
   const fav = swIsFav(it);
+  /* 入场延迟用组内序号，不用全局索引：全局索引到第 19 张就封顶，
+     后面的组会一开屏全部同时出现，反而没有「依次铺开」的节奏。 */
+  const d = k === undefined ? i : k;
   return `<div class="sw-card${fav?' is-fav':''}" role="button" tabindex="0" data-i="${i}"
-    style="--d:${Math.min(i,18)*16}ms" onclick="openSwModal(${i})"
+    style="--d:${Math.min(d,18)*16}ms" onclick="openSwModal(${i})"
     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openSwModal(${i})}">
     <div class="sw-card-swatch" style="background:${it.hex}">
       <span class="sw-card-hex">${String(it.hex).toUpperCase()}</span>
@@ -7574,7 +8949,6 @@ function swCardHtml(it, i) {
       <div class="sw-card-meta">
         ${it.code ? `<span class="sw-chip2 code">#${it.code}</span>` : ''}
         ${it.group ? `<span class="sw-chip2">${swEsc(it.group)}</span>` : ''}
-        <span class="sw-chip2">${swFamily(it.hex)}</span>
       </div>
     </div>
   </div>`;
@@ -7629,6 +9003,27 @@ function renderSwBrandGrid() {
       <div class="sw-brand-alias">${swEsc(alias || '—')}</div>
     </button>`;
   }).join('');
+  const n = document.getElementById('swBrandN');
+  if (n) n.textContent = brandDB.length;
+}
+/* 弹层开合。焦点进出要管：关掉后焦点留在被删掉的可聚焦元素上，
+   键盘用户下一次 Tab 会从文档开头重来。 */
+let swBrandPrevFocus = null;
+function openSwBrands() {
+  const m = document.getElementById('swBrandModal');
+  if (!m) return;
+  swBrandPrevFocus = document.activeElement;
+  renderSwBrandGrid();
+  m.hidden = false;
+  const first = m.querySelector('.sw-brand');
+  if (first) first.focus({ preventScroll: true });
+}
+function closeSwBrands() {
+  const m = document.getElementById('swBrandModal');
+  if (!m || m.hidden) return;
+  m.hidden = true;
+  if (swBrandPrevFocus && swBrandPrevFocus.focus) swBrandPrevFocus.focus({ preventScroll: true });
+  swBrandPrevFocus = null;
 }
 function swUseBrand(name) {
   openModal();
@@ -7715,6 +9110,12 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape')           closeSwModal();
     else if (e.key === 'ArrowLeft')   swStep(-1);
     else if (e.key === 'ArrowRight')  swStep(1);
+    return;
+  }
+  // 品牌名录弹层：Esc 关掉（它没有上一张/下一张，所以只认 Esc）
+  const bm = document.getElementById('swBrandModal');
+  if (bm && !bm.hidden) {
+    if (e.key === 'Escape') closeSwBrands();
     return;
   }
   // 「/」聚焦色卡搜索
@@ -7864,14 +9265,36 @@ function stListBy(kind) {
   else if (kind === 'status')  list = stStatusList();
   else list = [];
   list = list.filter(x => x.value > 0.0001);
-  const useReal = (kind === 'family');
-  list.forEach((x, i) => {
-    x.color = useReal ? (x.hex || ST_PALETTE[i % ST_PALETTE.length])
+  list.forEach(x => {
+    x.color = kind === 'family' ? (x.hex || ST_COLOR_FALLBACK)
       : kind === 'status' ? (x.name === '已用完' ? 'oklch(65% 0.22 25)' : 'oklch(72% 0.18 145)')
-      : ST_PALETTE[i % ST_PALETTE.length];
+      /* 品牌 / 材质 / 标签 / 规格走「按名字定色」：以前是 `ST_PALETTE[i]`，i 是**排序后**的位置，
+         换个口径（卷数↔重量）或改一次筛选，同一个品牌就会换个颜色 —— 图例和数字都在，
+         但「绿色那个」指的是谁全看运气。名字不变颜色就不变，才对得上眼睛。 */
+      : stNameColor(x.name);
   });
   return list;
 }
+
+/* 名字 → 颜色。品牌与材质各有一份固定顺序，按它在表里的位置取色板；
+   表外的东西再用哈希兜底。哈希单用会撞（5 个名字落 16 个槽，撞的概率不低），
+   固定顺序不会：品牌库和材质枚举本身是稳定列表。 */
+const ST_MAT_ORDER = ['PLA','PETG','ABS','TPU','ASA','PC','PA','PA-CF','支撑','其他'];
+const ST_COLOR_FALLBACK = 'oklch(70% 0.02 240)';
+function stNameIdx(name) {
+  const s = String(name || '').trim();
+  const up = s.toUpperCase();
+  let i = ST_MAT_ORDER.findIndex(m => m === up);
+  if (i >= 0) return i;
+  if (typeof brandDB !== 'undefined') {
+    i = brandDB.findIndex(b => b.canonical === s);
+    if (i >= 0) return i;
+  }
+  let h = 0;
+  for (let k = 0; k < s.length; k++) h = (h * 31 + s.charCodeAt(k)) >>> 0;
+  return h % ST_PALETTE.length;
+}
+function stNameColor(name) { return ST_PALETTE[stNameIdx(name) % ST_PALETTE.length]; }
 
 /* ---------- 视图：环形 ---------- */
 function stDonut(cfg, list, total) {
@@ -8036,22 +9459,30 @@ function stMatrixCard() {
   });
   const maxV = Math.max(...flat, 0);
   const colTotals = ms.map((m, j) => rows.reduce((s, r) => s + r.vals[j], 0));
-  const bg = v => maxV ? `background:rgba(77,217,192,${(0.06 + 0.6 * (v / maxV)).toFixed(3)})` : '';
+  /* 热度交给 CSS 的 color-mix 算，不再拼 rgba：原来的 rgba(77,217,192,…) 是写死的青色，
+     暗色主题下 60% 不透明度的青块会把数字淹掉。
+     两种主题各给一个强度：浅色 accent 是深青（46% 明度），60% 混出来仍是浅底，深字看得清；
+     深色 accent 是亮青（72% 明度），同样 60% 会把白字糊掉，所以单独压到 38%。 */
+  const bg = v => {
+    if (!maxV || !v) return '';
+    const p = Math.round(20 + 80 * (v / maxV));
+    return `--heat:${p}%;--heat-d:${Math.round(p * 0.38)}%`;
+  };
 
   return `<div class="st-card wide" data-id="matrix">
     <div class="st-card-head">
       <div class="st-card-ico">${ST_ICONS.matrix}</div>
       <div class="st-card-t">
         <div class="st-card-title">品牌 × 材质 交叉表</div>
-        <div class="st-card-sub">单元格 = 该品牌该材质的${unit === 'kg' ? '重量（kg）' : '卷数'}，颜色越深数值越大</div>
+        <div class="st-card-sub">单元格 = 该品牌该材质的${unit === 'kg' ? '重量（kg）' : '卷数'}，色块越浓数值越大；空格表示没有这种组合</div>
       </div>
     </div>
     <div class="st-mx-wrap"><table class="st-mx">
       <thead><tr><th>品牌 \\ 材质</th>${ms.map(m => `<th>${stEsc(m)}</th>`).join('')}<th>合计</th></tr></thead>
       <tbody>${rows.map(r => `<tr>
         <th>${stEsc(r.b)}</th>
-        ${r.vals.map((v, j) => `<td class="cell ${v ? '' : 'zero'}" style="${bg(v)}" tabindex="0" data-jump-b="${stEsc(r.b)}" data-jump-m="${stEsc(ms[j])}" onclick="stJumpMatrix(${stJs(r.b)},${stJs(ms[j])})" title="${stEsc(r.b)} · ${stEsc(ms[j])}：${stFmt(v)}${unit}">${v ? stFmt(v) : '–'}</td>`).join('')}
-        <td style="font-weight:700">${stFmt(r.rowTotal)}</td>
+        ${r.vals.map((v, j) => `<td class="cell ${v ? 'has' : 'zero'}" style="${bg(v)}" tabindex="0" data-jump-b="${stEsc(r.b)}" data-jump-m="${stEsc(ms[j])}" onclick="stJumpMatrix(${stJs(r.b)},${stJs(ms[j])})" title="${stEsc(r.b)} · ${stEsc(ms[j])}：${stFmt(v)}${unit}">${v ? stFmt(v) : ''}</td>`).join('')}
+        <td class="tot">${stFmt(r.rowTotal)}</td>
       </tr>`).join('')}</tbody>
       <tfoot><tr><th>合计</th>${colTotals.map(v => `<td>${stFmt(v)}</td>`).join('')}<td>${stFmt(grand)}</td></tr></tfoot>
     </table></div>
@@ -8489,8 +9920,16 @@ function stKpisHtml() {
   const cur = data.reduce((s, d) => s + stVal(d), 0);
   const top1 = (l) => l.length ? l[0].name + ' ' + stFmt(l[0].value) + unit : '—';
 
-  const items = [
-    { c:'a', l:'当前口径合计', v:stFmt(cur), u:unit, s:stMetric === 'weight' ? '按重量统计' : '按卷数统计' },
+  const items = [];
+  /* 「当前口径合计」在「剩余库存」下和「库存卷数 / 库存重量」是同一个数（stVal 只由
+     qty/finished 决定），8 张卡里有一张纯重复。默认范围下不画它，只留 7 张 ——
+     每张从 153px 松到 176px，副标「最多：polymaker 9卷」才读得出来。
+     换成「含已用完 / 仅已用完」时它才有独立含义，那时再补上。 */
+  if (stScope !== 'remain') {
+    items.push({ c:'a', l:'当前口径合计', v:stFmt(cur), u:unit,
+      s: stMetric === 'weight' ? '含已用完的总重' : '含已用完的总卷数' });
+  }
+  items.push(
     { c:'s', l:'库存卷数', v:String(rolls), u:'卷', s:'剩余可用' },
     { c:'', l:'库存重量', v:kg.toFixed(1), u:'kg', s:'单卷均重 ' + avg.toFixed(2) + ' kg' },
     { c:'d', l:'已用完', v:String(fin), u:'卷', s:finKg.toFixed(1) + ' kg 已消耗' },
@@ -8498,12 +9937,12 @@ function stKpisHtml() {
     { c:'p', l:'材质数', v:String(mats.length), s:'最多：' + top1(mats) },
     { c:'', l:'色系数', v:String(fams.length), s:'最多：' + top1(fams) },
     { c:'', l:'有料盘', v:spoolPct + '', u:'%', s:spool + ' / ' + data.length + ' 条带料盘' },
-  ];
+  );
   return items.map(it => `
     <div class="st-kpi ${it.c}">
       <div class="st-kpi-label">${it.l}</div>
       <div class="st-kpi-value">${it.v}${it.u ? `<small>${it.u}</small>` : ''}</div>
-      <div class="st-kpi-sub">${stEsc(it.s)}</div>
+      <div class="st-kpi-sub" title="${stEsc(it.s)}">${stEsc(it.s)}</div>
     </div>`).join('');
 }
 
@@ -8566,10 +10005,9 @@ function stJump(kind, name) {
   else if (kind === 'color')     { if (si) si.value = name; }  // TOP10 是耗材名，仍走搜索
   switchPage('inventory');
   flushSearch();                            // 同步生效，防抖残留会让筛选结果与提示不一致
-  /* 色系墙：筛选后墙上只剩这一张卡，再把它摊开 —— 统计页「点色系跳库存」才算真的跳到了。
-     **只在这里开，不要塞进 renderFam**：renderFam 会被 toggleEditMode / setFamDensity /
-     后台 sweep 反复调用，塞进去等于「每次渲染都弹面板」。 */
-  if (kind === 'family' && currentView === 'fam') openFamPanel(name);
+  /* 色系墙：筛选后墙上只剩这一张砖，而砖身本来就是全量摊开的 ——
+     不需要再「展开」任何东西，只给一个短促的族色描边脉冲，让「跳过来了」有落点。 */
+  if (kind === 'family') famFlash(name);
   window.scrollTo({ top: 0, behavior: 'smooth' });
   stToast('已筛选：' + (kind === 'family' ? name + '色系' : name));
 }
@@ -9193,21 +10631,37 @@ function dmFmtBytes(n) {
   if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
   return (n / 1048576).toFixed(2) + ' MB';
 }
+let dmShowEmptyKeys = false;
+function dmToggleEmptyKeys() {
+  dmShowEmptyKeys = !dmShowEmptyKeys;
+  renderStorageCard();
+}
 function renderStorageCard() {
   const el = document.getElementById('dmStorage');
   if (!el) return;
   let total = 0;
-  const rows = DM_STORE_KEYS.map(([k, label]) => {
+  const all = DM_STORE_KEYS.map(([k, label]) => {
     let raw = '';
     try { raw = localStorage.getItem(k) || ''; } catch (e) { raw = ''; }
     const n = dmByteLen(raw); total += n;
-    return `<div class="dm-kv"><span>${esc(label)} <span style="opacity:.5">${k}</span></span><b>${dmFmtBytes(n)}</b></div>`;
-  }).join('');
+    return { k, label, n };
+  });
+  /* 18 个键里通常只有 2–3 个有内容，剩下 15 行 0 B 把卡片撑到 400px ——
+     真正要看的「哪个键在吃配额」被稀释在一片零里。
+     有内容的按大小降序排在最上面，空的收进一个折叠条。 */
+  const used  = all.filter(r => r.n > 0).sort((a, b) => b.n - a.n);
+  const empty = all.filter(r => r.n === 0);
+  const row = r => `<div class="dm-kv"><span>${esc(r.label)} <span style="opacity:.5">${r.k}</span></span><b>${dmFmtBytes(r.n)}</b></div>`;
   const pct = Math.min(100, total / DM_QUOTA * 100);
   el.innerHTML = `
     <div class="dm-meter"><div class="dm-meter-fill" style="width:${pct.toFixed(2)}%"></div></div>
     <div class="dm-kv"><span>已用 / 约 5 MB 配额</span><b>${dmFmtBytes(total)} · ${pct.toFixed(1)}%</b></div>
-    ${rows}
+    ${used.length ? used.map(row).join('') : '<div class="dm-kv"><span>还没有任何数据落在本地</span><b>0 B</b></div>'}
+    ${empty.length ? `<button class="dm-more" onclick="dmToggleEmptyKeys()" aria-expanded="${dmShowEmptyKeys}">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(${dmShowEmptyKeys ? 180 : 0}deg);transition:transform .18s"><polyline points="6 9 12 15 18 9"/></svg>
+        ${dmShowEmptyKeys ? '收起空项' : `其余 ${empty.length} 项为空`}
+      </button>
+      <div class="dm-empty-list" ${dmShowEmptyKeys ? '' : 'hidden'}>${empty.map(row).join('')}</div>` : ''}
     <div class="dm-note">占比超过 <b>80%</b> 就该收拾了：清理用完的记录、合并重复项，或者先导出一份 JSON 备份再清空。</div>`;
 }
 
@@ -9417,7 +10871,9 @@ function switchPage(p) {
   });
   if (p === 'swatch') {
     if (!swAll.length) swInit();
-    else { renderSwStats(); renderSwatches(); }
+    /* 只补统计条。渲染交给下面的 setSwView —— 它末尾会调 renderSwatches，
+       以前两处都调，切到色卡页要把 692 张卡建两遍 DOM。 */
+    else renderSwStats();
     setSwView(swViewMode);   // 同步视图按钮态
   }
   if (p === 'stats') renderStatsPage();
@@ -9426,6 +10882,15 @@ function switchPage(p) {
   /* 停在库存/统计页时打印机页不刷新，任务结束后就没机会扣减。
      切到这两个页时静默同步一次用量（15s 节流，纯后台，失败不打扰）。 */
   else if (p === 'inventory' || p === 'stats') prnUsageSync();
+
+  /* 换页就回顶。从色卡库滚到第 40 张再点「数据管理」，落地却是新页面的中段 ——
+     眼前一片没有上下文的卡片，工具栏还在屏幕外。滚动位置不属于页面身份，
+     换了一个页面就该从它的开头看起。
+     stJump / stJumpMatrix 这类「带落点」的调用方会在 switchPage 之后自己再滚，
+     顺序上它们覆盖这里的归零，不受影响。 */
+  window.scrollTo(0, 0);
+  paintPinnedH();
+  paintPinned();
 }
 
 /* 静默拉一次用量并扫描扣减。用于「不在打印机页」的场景，保证任务打完一定有人来结算。 */
@@ -9497,6 +10962,16 @@ async function prnProbe() {
   } catch (e) { printerOnline = false; printerFeatures = []; }
   prnSetFlag();
   return printerOnline;
+}
+
+/* 「重新检测服务」的唯一入口：prnProbe 只返回布尔、不吭声，
+   离线态那个按钮点下去要是没反馈，用户只会再点一次。 */
+async function prnRecheckAgent() {
+  toast('正在检测本地服务…');
+  const ok = await prnProbe();
+  if (typeof renderPrintersPage === 'function') renderPrintersPage();
+  toast(ok ? '本地服务已连接' : '仍未检测到服务：确认 start-printer-agent.bat 窗口还开着，地址与端口是否一致',
+    ok ? 'ok' : 'warn');
 }
 
 /* 刷新/搜索的运行态：按钮转圈、并发保护、进入页面自动刷新的节流时间戳 */
@@ -12397,6 +13872,15 @@ function renderPrintersPage() {
   if (off) off.hidden = printerOnline;
   if (on) on.hidden = !printerOnline;
   if (syncBtn) syncBtn.hidden = !printerOnline;
+  /* 「刷新」刷新的是每台打印机的实时状态，离线时点了什么也不会变 ——
+     它和旁边那个红标签「服务未启动」叠在一起，还容易被当成能解决问题的按钮。 */
+  const refreshBtn = document.getElementById('prnRefreshBtn');
+  if (refreshBtn) refreshBtn.hidden = !printerOnline;
+  /* 四张流水卡在离线时只有「暂无记录」，收起来换一张能力清单 */
+  const dataArea = document.getElementById('prnDataArea');
+  const offData = document.getElementById('prnOfflineData');
+  if (dataArea) dataArea.hidden = !printerOnline;
+  if (offData) offData.hidden = printerOnline;
   const urlInput = document.getElementById('prnAgentUrlInput');
   if (urlInput) urlInput.value = printerCfg.agentUrl;
   prnRenderPending();
@@ -12447,10 +13931,6 @@ document.addEventListener('keydown', e => {
   if (spoolPopOpen()) { e.preventDefault(); closeSpoolPop(true); return; }
   const cfp = document.getElementById('colorFilterPanel');
   if (cfp && !cfp.hidden) { closeColorPanel(); return; }
-  /* 色系墙的行内面板：比锚定浮层和颜色筛选面板重，比 .sw-dd / 模态轻。
-     焦点可能落在面板里，也可能还停在卡片标题上 —— 都走同一个关闭入口，
-     并把焦点还回那张卡的标题行（面板被 remove 后焦点会掉到 body）。 */
-  if (famPanelEl()) { e.preventDefault(); closeFamPanel({ focus: true }); return; }
   const dd = document.querySelector('.sw-dd-panel.open');
   if (dd && typeof closeSwDds === 'function') { closeSwDds(); return; }
   const el = topMostOpenModal();
@@ -12488,6 +13968,8 @@ MODAL_IDS.forEach(id => {
    等用户真正切到色卡页时再由 switchPage 触发 swInit() */
 loadTrash();     // 回收站在启动时读一次，之后由删除操作维护
 renderStatsPage();
+/* 卡片悬停洪水：只建一个隐藏宿主 + 挂监听，上下文要等第一次真正悬停才申请 */
+fxMount();
 </script>
 </body>
 </html>

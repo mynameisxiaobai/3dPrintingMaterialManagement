@@ -1,16 +1,17 @@
-/* visual-spoolpop.js — 色系墙「无 hover 展开 + 行内面板 + 锚定浮层」浏览器级验收
+/* visual-spoolpop.js — 色系砖墙「瀑布流打包 + 锚定浮层」浏览器级验收
    **非 CI**：需要 playwright-core + 已缓存的 chromium（jsdom 没有布局引擎，
-   offsetTop / getBoundingClientRect 全 0，面板插入位置与浮层定位完全测不了）。
+   offsetTop / getBoundingClientRect 全 0，砖块坐标与浮层定位完全测不了）。
      NODE_PATH=C:/Users/Administrator/.workbuddy/binaries/node/workspace/node_modules \
        node tests/visual-spoolpop.js
    覆盖：
-   ① 鼠标停在卡头 1.5s → 不发生任何 class / 高度变化，不会弹出面板
+   ① 鼠标停在砖头 1.5s → 不发生任何 class / 高度变化（没有 hover 展开）
    ② 鼠标停在迷你卷上 1.2s → 不弹浮层（浮层只认点击）
    ③ 点迷你卷 → 浮层出现，四边都在视口内，且贴在格子下方 8px
    ④ 滚到页面底部那一组 → 浮层自动翻到格子上方
    ⑤ 点外部 / Esc / 滚页面分别关闭；滚浮层内部不关
    ⑥ 编辑模式下点迷你卷 = 勾选，不弹浮层
-   ⑦ 行内面板几何：插在该卡所在行的**下一行行首**、占满整行、同排其他卡不重排、关闭后复原
+   ⑦ 瀑布流几何：砖块互不重叠、列内无空洞、墙高 = 最高列底、全量渲染不截断、
+      卷多的砖被加宽、缩窗后自动重排且仍然无重叠
    纯逻辑与静态防回退断言见 tests/check-views.js。 */
 'use strict';
 const path = require('path');
@@ -22,9 +23,9 @@ const EXEC = 'C:/Users/Administrator/AppData/Local/ms-playwright/chromium-1228/c
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log('  ✓ ' + m); } else { fail++; console.log('  ✗ ' + m); } };
 
-/* 96 条数据 / 12 个色系各 8 条 —— 1280 宽下 4 列 → 3 行卡墙。
-   行数够多才测得出「底部那组浮层翻到上方」和「滚动关闭」，
-   每组 8 条正好等于 mini 标准档的 cap，卡片墙不会出现「还有 N 卷」。 */
+/* 12 个色系 × 8 条 + 红系额外 22 条 = 118 条。
+   「红」凑到 30 条是刻意的：它按 1 列宽放会到 630px 高，必须触发「加宽到 2 列」，
+   7e 验的就是这条判据；其余色系 8 条保持竖向，形成高低混排的瀑布墙。 */
 const FAMS = [['#C12E1F', '红'], ['#F59042', '橙'], ['#8B5E34', '棕'], ['#F5D547', '黄'],
   ['#4CAF50', '绿'], ['#2EC4B6', '青'], ['#4A90D9', '蓝'], ['#9B59B6', '紫'],
   ['#F07FB0', '粉'], ['#F2F2F2', '白'], ['#9AA0A6', '灰'], ['#22262C', '黑']];
@@ -35,19 +36,12 @@ FAMS.forEach(([c, n], fi) => {
       material: j % 2 ? 'PLA' : 'PETG', color: c, weight: 1000, qty: (j % 4) + 1, hasSpool: j % 3 !== 0 });
   }
 });
+for (let j = 9; j <= 30; j++) {
+  SEED.push({ id: 1000 + j, name: '红料 ' + j, brand: 'esun', material: 'PLA',
+    color: '#C12E1F', weight: 1000, qty: 1, hasSpool: true });
+}
 
 const near = (a, b, tol) => Math.abs(a - b) <= (tol == null ? 1.5 : tol);
-
-/* 每张卡的 offsetTop / offsetLeft / 高度 —— 判「同一行」「是否被重排」的唯一口径。
-   不用 getBoundingClientRect：那玩意含 transform，卡片入场动画期间同行能差 6px。 */
-const cardsGeo = page => page.evaluate(() =>
-  [...document.querySelectorAll('#famView .fam-wall > .fam-grp')].map(g => ({
-    fam: g.dataset.fam,
-    top: Math.round(g.offsetTop),
-    left: Math.round(g.offsetLeft),
-    h: Math.round(g.offsetHeight),
-  }))
-);
 
 (async () => {
   const browser = await chromium.launch({
@@ -71,13 +65,12 @@ const cardsGeo = page => page.evaluate(() =>
   console.log('色系卡数 =', await page.locator('#famView .fam-grp').count(),
     '/ 迷你卷数 =', await page.locator(chipSel).count());
 
-  /* ── ① 悬停卡头不许有任何展开 ── */
+  /* ── ① 悬停砖头不许有任何展开 ── */
   console.log('── ① hover 不展开 ──');
   const head = page.locator('#famView .fam-grp .fam-hd').nth(1);
   const hb = await head.boundingBox();
   const snap = () => page.evaluate(() => ({
-    expanded: [...document.querySelectorAll('#famView .fam-grp.is-expanded')].length,
-    panel: document.querySelectorAll('#famPanel').length,
+    hits: [...document.querySelectorAll('#famView .fam-grp.is-hit')].length,
     h: document.querySelector('#famView').getBoundingClientRect().height,
   }));
   const before = await snap();
@@ -91,8 +84,7 @@ const cardsGeo = page => page.evaluate(() =>
   await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
   await page.waitForTimeout(1500);
   const afterHover = await snap();
-  ok(afterHover.expanded === before.expanded && afterHover.panel === 0,
-    `1a 悬停 1.5s 既不展开卡也不弹面板（${before.expanded} → ${afterHover.expanded} / panel ${afterHover.panel}）`);
+  ok(afterHover.hits === before.hits, `1a 悬停 1.5s 不触发任何高亮/展开（${before.hits} → ${afterHover.hits}）`);
   ok(await page.evaluate(() => window.__flips) === 0,
     `1b 悬停期间 class 一次都没变（实测 ${await page.evaluate(() => window.__flips)} 次）`);
   ok(near(afterHover.h, before.h, 2), `1c 视图总高度不变（${before.h.toFixed(0)} → ${afterHover.h.toFixed(0)}）`);
@@ -205,81 +197,93 @@ const cardsGeo = page => page.evaluate(() =>
   await page.evaluate(() => toggleEditMode());
   await page.waitForTimeout(300);
 
-  /* ── ⑦ 行内面板几何：插在「下一行行首」，其他卡不重排 ── */
-  console.log('── ⑦ 行内面板几何 ──');
-  await page.evaluate(() => window.scrollTo(0, 0));
+  /* ── ⑦ 瀑布流几何：不重叠、列内无洞、墙高对齐、全量渲染、卷多的砖加宽 ── */
+  console.log('── ⑦ 瀑布流几何 ──');
+  await page.evaluate(() => { window.scrollTo(0, 0); });
   await page.waitForTimeout(300);
 
-  const t0 = await cardsGeo(page);
-  /* 点第 2 列那张卡 —— 这是「行中间插入」bug 的唯一回归网：
-     若面板紧跟被点卡插入，同一行后面两张会被挤到面板下方，墙就散了。 */
-  const pick = t0[1];
-  const sameRow = t0.filter(c => c.top === pick.top);
-  const afterInRow = sameRow.filter(c => c.left > pick.left);
-  const below = t0.filter(c => c.top > pick.top);
-  const rowBottom = Math.max(...sameRow.map(c => c.top + c.h));
-
-  await page.locator(`#famView .fam-grp[data-fam="${pick.fam}"] .fam-hd`).click();
-  await page.waitForTimeout(400);
-
-  const panelGeo = await page.evaluate(() => {
+  const wallGeo = () => page.evaluate(() => {
     const wall = document.getElementById('famWall');
-    const p = document.getElementById('famPanel');
-    if (!p) return null;
-    const wr = wall.getBoundingClientRect();
-    const pr = p.getBoundingClientRect();
+    const cards = [...wall.children].filter(e => e.classList.contains('fam-grp'));
+    const list = cards.map(c => ({
+      fam: c.dataset.fam, span: c.dataset.span,
+      l: Math.round(c.offsetLeft), t: Math.round(c.offsetTop),
+      w: Math.round(c.offsetWidth), h: Math.round(c.offsetHeight),
+      n: c.querySelectorAll('.spool-chip').length,
+    }));
+    /* 两两重叠检测：矩形的边允许刚好相接，所以每边留 1px 容差 */
+    let overlaps = [];
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i], b = list[j];
+        if (a.l < b.l + b.w - 1 && b.l < a.l + a.w - 1 && a.t < b.t + b.h - 1 && b.t < a.t + a.h - 1) {
+          overlaps.push(a.fam + '×' + b.fam);
+        }
+      }
+    }
+    /* 列内空洞：同列相邻两砖之间的竖向空档（正常只有 14px 的砖缝） */
+    const cols = new Map();
+    list.forEach(c => {
+      if (!cols.has(c.l)) cols.set(c.l, []);
+      cols.get(c.l).push(c);
+    });
+    let holes = [];
+    cols.forEach(arr => {
+      arr.sort((x, y) => x.t - y.t);
+      for (let i = 1; i < arr.length; i++) {
+        const gap = arr[i].t - (arr[i - 1].t + arr[i - 1].h) - 14;
+        if (gap > 1.5) holes.push(arr[i - 1].fam + '↓' + arr[i].fam + ' ' + Math.round(gap) + 'px');
+      }
+    });
     return {
-      top: Math.round(p.offsetTop), left: Math.round(p.offsetLeft),
-      w: Math.round(pr.width), wallW: Math.round(wr.width),
-      vLeft: Math.round(pr.left), vRight: Math.round(pr.right),
-      vWallLeft: Math.round(wr.left), vWallRight: Math.round(wr.right),
-      chips: p.querySelectorAll('.spool-chip').length,
-      prev: p.previousElementSibling ? (p.previousElementSibling.dataset.fam || null) : null,
+      list, overlaps, holes,
+      cols: cols.size,
+      wallH: Math.round(wall.getBoundingClientRect().height),
+      maxBottom: Math.round(Math.max.apply(null, list.map(c => c.t + c.h))),
+      chips: document.querySelectorAll('#famView .spool-chip').length,
+      packed: wall.classList.contains('is-packed'),
     };
   });
-  ok(!!panelGeo, '7a 点卡 → 面板出现');
-  ok(panelGeo && near(panelGeo.w, panelGeo.wallW, 2),
-    `7b 面板占满整行宽（${panelGeo && panelGeo.w} vs wall ${panelGeo && panelGeo.wallW}）`);
-  ok(panelGeo && near(panelGeo.vLeft, panelGeo.vWallLeft, 2) && near(panelGeo.vRight, panelGeo.vWallRight, 2),
-    `7c 面板左右缘与墙对齐（${panelGeo && panelGeo.vLeft}..${panelGeo && panelGeo.vRight} vs ${panelGeo && panelGeo.vWallLeft}..${panelGeo && panelGeo.vWallRight}）`);
-  ok(panelGeo && panelGeo.top >= rowBottom - 1,
-    `7d 面板在该行下沿之后（panel.t=${panelGeo && panelGeo.top} ≥ row.bottom=${rowBottom}）`);
 
-  const t1 = await cardsGeo(page);
-  const stillInRow = afterInRow.filter(c => {
-    const now = t1.find(x => x.fam === c.fam);
-    return now && now.top === c.top;
+  const g0 = await wallGeo();
+  ok(g0.packed, '7a 墙已打包（.is-packed 已挂，坐标生效）');
+  ok(g0.overlaps.length === 0, `7b 砖块互不重叠（${g0.cols} 列 / ${g0.list.length} 块，重叠 ${g0.overlaps.length} 对）`);
+  ok(g0.holes.length === 0, `7c 每列内部没有空洞（${g0.holes.join('、') || '无'}）`);
+  ok(near(g0.wallH, g0.maxBottom, 2), `7d 墙高 = 最高列底（${g0.wallH} vs ${g0.maxBottom}）`);
+  ok(g0.chips === SEED.length, `7e 全量渲染：${SEED.length} 条 = ${g0.chips} 格（没有截断）`);
+
+  const red = g0.list.find(c => c.fam === '红');
+  const small = g0.list.filter(c => c.fam !== '红');
+  ok(red && red.span === '2', `7f 卷数最多的红系（${red && red.n} 格）被加宽到 2 列（data-span=${red && red.span}）`);
+  ok(small.every(c => c.span === '1'), '7g 其余色系仍是 1 列竖向（卷少的竖着放）');
+  ok(red && red.w > 1.9 * small[0].w, `7h 宽砖宽度 ≈ 2 列（${red && red.w} vs 单列 ${small[0].w}）`);
+
+  /* 左缘必须落在列网格上，且宽度只能是 1 列或 2 列 */
+  const colW = Math.min.apply(null, g0.list.map(c => c.w));
+  const pitch = colW + 14;
+  const offGrid = g0.list.filter(c => {
+    const k = c.l / pitch;
+    const onLeft = Math.abs(k - Math.round(k)) * pitch < 1.5;
+    const onWidth = Math.abs(c.w - colW) < 1.5 || Math.abs(c.w - (colW * 2 + 14)) < 1.5;
+    return !onLeft || !onWidth;
   });
-  ok(stillInRow.length === afterInRow.length,
-    `7e 同排后面的 ${afterInRow.length} 张卡仍在原行（插到行中间会把它们甩到面板下方：${afterInRow.length - stillInRow.length} 张被挤走）`);
+  ok(offGrid.length === 0,
+    `7i 每块砖的 left/width 都对齐列网格（${offGrid.map(c => c.fam + '@' + c.l).join('、') || '全部对齐'}）`);
 
-  const pushed = below.filter(c => {
-    const now = t1.find(x => x.fam === c.fam);
-    return now && now.top > c.top;
-  });
-  ok(pushed.length === below.length,
-    `7f 下一行起的 ${below.length} 张卡整体下移（${pushed.length} 张被推开）`);
-
-  ok(panelGeo && panelGeo.prev && sameRow.some(c => c.fam === panelGeo.prev),
-    `7g 面板紧跟在「被点卡所在行的最后一张」之后（prev=${panelGeo && panelGeo.prev}）`);
-
-  const cardChips = await page.locator(`#famView .fam-grp[data-fam="${pick.fam}"] .spool-chip`).count();
-  ok(panelGeo && panelGeo.chips >= cardChips,
-    `7h 面板里是全量（${panelGeo && panelGeo.chips} ≥ 卡内 ${cardChips}）`);
-  ok(await page.evaluate(() => document.activeElement && document.activeElement.id === 'famPanel'),
-    '7i 焦点进入面板（DOM 上隔了同排卡，按 Tab 走不到）');
-
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(350);
-  ok(await page.evaluate(() => !document.getElementById('famPanel')), '7j Esc → 面板移除');
-  const t2 = await cardsGeo(page);
-  const restored = t0.every(c => {
-    const now = t2.find(x => x.fam === c.fam);
-    return now && now.top === c.top && now.left === c.left;
-  });
-  ok(restored, '7k 关闭后所有卡回到原位（top 与 left 全部复原）');
-  ok(await page.evaluate(() => document.activeElement && document.activeElement.classList.contains('fam-hd')),
-    '7l 关闭后焦点回到卡头');
+  /* 缩窗 → 重新打包（window resize + rAF），仍然不重叠、不出洞 */
+  await page.setViewportSize({ width: 720, height: 900 });
+  await page.waitForTimeout(500);
+  const g1 = await wallGeo();
+  ok(g1.cols <= 2, `7j 缩到 720px → 降到 ${g1.cols} 列（列数由容器宽度算，不写死）`);
+  ok(g1.overlaps.length === 0 && g1.holes.length === 0,
+    `7k 重排后仍然不重叠、列内无空洞（重叠 ${g1.overlaps.length} / 空洞 ${g1.holes.length}）`);
+  ok(g1.list.every(c => c.span === '1'),
+    `7l 双列时不再加宽（cols<3 → maxSpan 锁 1，${g1.list.map(c => c.span).join('')}）`);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.waitForTimeout(500);
+  const g2 = await wallGeo();
+  ok(g2.chips === SEED.length && g2.overlaps.length === 0 && g2.holes.length === 0,
+    '7m 缩回原宽度 → 自动复原且几何仍正确');
 
   await browser.close();
   console.log(`\n${fail === 0 ? '✅' : '❌'} 浏览器级验收：${pass} 通过 / ${fail} 失败`);
