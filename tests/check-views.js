@@ -588,9 +588,21 @@ setTimeout(() => {
     ok(!/\.pinned\s*\{[^}]*overflow/.test(SRC),
       '12.56 .pinned 不能有 overflow —— 祖先有 overflow 会让 sticky 直接失效');
 
-    /* —— 紧凑态 —— */
-    ok(/@media \(min-width: 901px\)[\s\S]{0,700}is-tight \.stat-card[\s\S]{0,200}display:\s*flex/.test(SRC),
-      '12.57 紧凑态把统计卡压成一行胶囊，且只在桌面生效');
+    /* —— 紧凑态 ——
+       这里守的是「可动画」：display 一旦在两种状态间切换，高度就没法过渡，
+       切换那一帧会瞬移几十像素 —— 用户报的「顶部闪 / 很僵硬」就是那个。 */
+    ok(/@media \(min-width: 901px\)[\s\S]{0,1200}is-tight \.stat-card\s*\{\s*padding:/.test(SRC),
+      '12.57 紧凑态靠缩内边距与字号实现，且只在桌面生效');
+    ok(!/is-tight \.stat-card\s*\{[^}]*display:\s*(flex|grid)/.test(SRC) &&
+      !/is-tight \.stats-bar\s*\{[^}]*display:/.test(SRC),
+      '12.57a 紧凑态不许改 display（改了就没法插值，高度只能瞬跳）');
+    ok(/\.pinned \.stats-bar\s*\{[^}]*transition:[^}]*gap/.test(SRC) &&
+      /\.pinned \.stat-card\s*\{[^}]*transition:[^}]*padding/.test(SRC) &&
+      /\.pinned \.stat-label\s*\{[^}]*transition:[^}]*font-size/.test(SRC) &&
+      /\.pinned \.stat-value\s*\{[^}]*transition:\s*font-size/.test(SRC),
+      '12.57b 四层（条 / 卡 / 标签 / 数值）都挂了过渡，高度才会连续变化');
+    ok(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.pinned \.stats-bar, \.pinned \.stat-card, \.pinned \.stat-label, \.pinned \.stat-value\s*\{\s*transition:\s*none/.test(SRC),
+      '12.57c 减少动态效果时关掉这层收缩动效');
     ok(/is-tight \.stat-label\s*\{[^}]*text-transform:\s*none/.test(SRC),
       '12.58 紧凑态的标签不做全大写（小字全大写就是噪音）');
     ok(/@media \(max-width: 900px\)\s*\{\s*\.pinned\s*\{\s*position:\s*static/.test(SRC),
@@ -614,8 +626,12 @@ setTimeout(() => {
       '12.63b 退出阈值 = 进入阈值 − 实测高度差 − 余量：迟滞宽度必须跨过高度差');
     ok(/tight = pinTight \? y > off : y > PIN_TIGHT_ON/.test(SRC),
       '12.63c 阈值判定带记忆（pinTight 是迟滞状态，不是每帧重算的纯函数）');
-    ok(/pinDelta = Math\.min\(\d+, Math\.max\(pinDelta, Math\.abs\(h1 - h0\)\)\)/.test(SRC),
-      '12.63d 高度差是翻转前后各量一次得到的，且只取最大值（估小就会继续抖）');
+    ok(/const d = Math\.abs\(pinLooseH - pinTightH\)/.test(SRC) && /if \(d >= 8\) pinDelta = Math\.min\(\d+, d\)/.test(SRC),
+      '12.63d 高度差 = 两种状态的高度各量一次相减；差值过小（该页没有紧凑态）不许覆盖已知值');
+    ok(/page\.id !== pinMeasurePage/.test(SRC),
+      '12.63d1 测量按页面隔离 —— 色卡库/统计页的 .pinned 高度差不能混进来');
+    ok(/setTimeout\(measurePinHeights, \d+\)/.test(SRC) && !/if \(h0 && h1\)/.test(SRC),
+      '12.63d2 高度差是过渡落定后延时量的，不是改完 class 当场读的');
     ok(/pinFreeze = pinTight/.test(SRC) && /if \(pinFreeze !== null && y <= 1\)/.test(SRC),
       '12.63e 回顶动画期间冻结紧凑态，落地（y<=1）才解冻');
     ok(/PIN_FREEZE_OFF_EVENTS\.forEach\(t => \{[\s\S]{0,200}removeEventListener/.test(SRC) &&

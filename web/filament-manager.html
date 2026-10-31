@@ -1555,28 +1555,40 @@ try {
     .pinned.is-stuck { box-shadow: none; }
   }
 
-  /* ── 紧凑态：滚动超过 120px 后统计卡压成一行胶囊 ──
-     从 5 张 96px 的卡变成 5 个 34px 的胶囊，把 62px 还给内容。
+  /* ── 紧凑态：滚动超过 120px 后统计卡整排收进去 ──
+     这里有一个刻意的取舍：**不能再用 display:grid → flex 把标签和数字排成一行**。
+     display 不可插值，切换那一帧高度从 96px 直接掉到 34px，下面的内容瞬移 62px ——
+     那就是「滚到一半顶部闪一下 / 很僵硬」的来源，也是上一版回到顶部会连闪三下的物理基础。
+     现在卡片始终是 block，紧凑态只缩内边距与字号，高度变化因此可以过渡：
+     视觉上是「整排卡片平滑收进去」，而不是「换了一套卡片」。
+     代价：紧凑态比原来的一行胶囊高约 8px（标签与数字仍分两行），换 180ms 连续动效。
      标签不删只缩：删了「27」就不知道是几卷还是几克。
      只在桌面生效 —— 窄屏本来就不吸顶（见 900px 断点），压缩过去没人受益。 */
   @media (min-width: 901px) {
-    /* 网格换成紧贴内容的横排：auto-fit 会把 5 个胶囊拉满整行，
-       每个变成一条 190px 的空框，标签和数字分在两头，读起来像表单而不是读数字。 */
-    .pinned.is-tight .stats-bar {
-      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;
+    .pinned .stats-bar {
+      transition: gap var(--dur-2) var(--ease-out), margin-bottom var(--dur-2) var(--ease-out);
     }
-    .pinned.is-tight .stat-card {
-      /* width:auto 是必须的：正常态下 button.stat-card 用 width:100% 撑满 grid 格子，
-         带进 flex 行里就成了「每张卡占满一行」，5 张卡叠成 191px。 */
-      flex: 0 1 auto; width: auto;
-      display: flex; align-items: baseline; gap: 7px;
-      padding: 7px 12px; border-radius: var(--r);
+    .pinned .stat-card {
+      transition: border-color var(--dur-2) var(--ease-out), background-color var(--dur-2) var(--ease-out),
+                  padding var(--dur-2) var(--ease-out), border-radius var(--dur-2) var(--ease-out);
     }
+    .pinned .stat-label {
+      transition: font-size var(--dur-2) var(--ease-out), letter-spacing var(--dur-2) var(--ease-out),
+                  margin-bottom var(--dur-2) var(--ease-out);
+    }
+    .pinned .stat-value { transition: font-size var(--dur-2) var(--ease-out); }
+
+    .pinned.is-tight .stats-bar { gap: 8px; margin-bottom: 10px; }
+    .pinned.is-tight .stat-card { padding: 6px 12px 5px; border-radius: var(--r); }
     .pinned.is-tight .stat-label {
-      margin: 0; font-size: 0.61rem; letter-spacing: 0.04em;
+      margin-bottom: 3px; font-size: 0.58rem; letter-spacing: 0.04em;
       text-transform: none;  /* 小字再全大写就成噪音了 */
     }
-    .pinned.is-tight .stat-value { font-size: 0.96rem; }
+    .pinned.is-tight .stat-value { font-size: 0.98rem; }
+  }
+  /* 前庭敏感的人不需要这层「收缩动效」；关掉不影响任何功能，只是回到瞬时切换 */
+  @media (prefers-reduced-motion: reduce) {
+    .pinned .stats-bar, .pinned .stat-card, .pinned .stat-label, .pinned .stat-value { transition: none; }
   }
 
   /* ── 回到顶部 ──
@@ -8540,15 +8552,10 @@ function paintPinned() {
     tight = pinTight ? y > off : y > PIN_TIGHT_ON;
   }
 
-  /* 翻转时量一次高度差留作迟滞宽度。取见过的最大值：估小了就还会抖，
-     估大一点只是让展开更贴近顶部，无害。 */
-  const act = document.querySelector('.page.active .pinned');
-  if (tight !== pinTight && act) {
-    const h0 = act.getBoundingClientRect().height;
-    act.classList.toggle('is-tight', tight);
-    const h1 = act.getBoundingClientRect().height;
-    if (h0 && h1) pinDelta = Math.min(220, Math.max(pinDelta, Math.abs(h1 - h0)));
-  }
+  /* 翻转时安排一次高度差实测。不能当场量：紧凑态现在是 180ms 过渡，
+     刚改完 class 读到的还是旧高度，差值会算成 0（于是迟滞失效、又开始横跳）。
+     等过渡落定（180ms + 余量）再量，两种状态的高度各缓存一份。 */
+  if (tight !== pinTight) schedulePinMeasure();
   pinTight = tight;
 
   document.querySelectorAll('.pinned').forEach(el => {
@@ -8577,6 +8584,33 @@ function pinUnfreeze() {
   pinFreeze = null;
   PIN_FREEZE_OFF_EVENTS.forEach(t => window.removeEventListener(t, pinUnfreeze, true));
   schedulePinned();
+}
+
+/* 量「紧凑 ↔ 展开」的真实高度差，给迟滞用。要等过渡结束才量得准，所以是延时任务。
+   两种状态的高度分别缓存：哪次量的是哪种状态，按 pinTight 判断。
+   缓存必须按页面隔离：色卡库 / 统计页的 .pinned 里没有 .stat-card，紧凑态规则不生效，
+   它们的高度差不该算进来 —— 混着算会得出 0 或跨页的假差值，迟滞宽度就失准了。 */
+let pinTightH = 0, pinLooseH = 0, pinMeasureTimer = 0, pinMeasurePage = '';
+function measurePinHeights() {
+  pinMeasureTimer = 0;
+  const page = document.querySelector('.page.active');
+  const act = page && page.querySelector('.pinned');
+  if (!act) return;
+  if (page.id !== pinMeasurePage) { pinMeasurePage = page.id; pinTightH = 0; pinLooseH = 0; }
+  const h = act.getBoundingClientRect().height;
+  if (!h) return;                       // 页面隐藏 / 未布局
+  if (pinTight) pinTightH = h; else pinLooseH = h;
+  if (pinTightH && pinLooseH) {
+    const d = Math.abs(pinLooseH - pinTightH);
+    /* 差太小说明这页压根没有紧凑态（色卡库 / 统计页），不能拿它把已知的有效值覆盖成 0 ——
+       迟滞宽度归零就又回到「阈值上横跳」。 */
+    if (d >= 8) pinDelta = Math.min(240, d);
+  }
+}
+function schedulePinMeasure() {
+  if (pinMeasureTimer) clearTimeout(pinMeasureTimer);
+  /* 260ms = 过渡 180ms + 两帧余量。连翻两次时后一次会把定时器推后，最终只量稳态。 */
+  pinMeasureTimer = setTimeout(measurePinHeights, 260);
 }
 
 /* 吸顶工作台的实际高度，写进 --pinned-h。
@@ -8640,6 +8674,8 @@ renderAll();
 paintChrome();
 paintPinnedH();
 paintPinned();
+/* 首屏这一量是「展开态」的高度基准；没有它，第一次进紧凑态时量不出差值（只有一半数据） */
+schedulePinMeasure();
 /* 启动即探测本地 printer-agent 服务（异步、不阻塞首屏；失败只置离线标志） */
 prnProbe();
 

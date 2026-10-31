@@ -162,6 +162,30 @@ const wallGeo = () => {
   ok(labels.some(s => /耗材总数/.test(s)) && labels.some(s => /kg/.test(s)),
     '3d 标签没有被压掉（删了标签只剩数字就不知道是什么了）');
 
+  /* 3e/3f：紧凑态必须是连续过渡而不是瞬切。
+     以前是 display:grid → flex 把标签和数字排成一行，display 不可插值，切换那一帧
+     高度直接掉 60px、内容瞬移 —— 那就是用户说的「顶部闪 / 很僵硬」。 */
+  const disp = await page.evaluate(() => ({
+    bar: getComputedStyle(document.getElementById('statsBar')).display,
+    card: getComputedStyle(document.querySelector('#statsBar .stat-card')).display,
+  }));
+  ok(disp.bar === 'grid' && disp.card === 'block',
+    `3e 紧凑态没换 display（${disp.bar} / ${disp.card}）—— 换了高度就没法插值`);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(450);
+  const collapseH = await page.evaluate(async () => {
+    const bar = document.getElementById('statsBar');
+    const seen = []; let stop = false;
+    const tick = () => { seen.push(Math.round(bar.getBoundingClientRect().height * 10) / 10); if (!stop) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+    window.scrollTo(0, 600);
+    await new Promise(r => setTimeout(r, 600));
+    stop = true; return seen;
+  });
+  const uniqH = [...new Set(collapseH)];
+  const between = uniqH.filter(h => h < uniqH[0] - 1 && h > uniqH[uniqH.length - 1] + 1).length;
+  ok(between >= 2, `3f 收缩过程采到 ${between} 个中间高度（${uniqH.join(' → ')}）—— 是过渡不是瞬切`);
+
   /* ── ④ 回到顶部 ── */
   console.log('── ④ 回到顶部 ──');
   ok(b.toTop, '4a 滚过 320px 后按钮出现');
@@ -201,7 +225,9 @@ const wallGeo = () => {
   ok(flight.length > 30, `4e 采到 ${flight.length} 帧（够判断闪不闪）`);
   ok(flips.length === 1, `4f 全程只翻转一次紧凑态（翻转点 y=${flips.join(',') || '无'}）`);
   ok(backs.length === 0, `4g 上滚途中一次都没往回弹（${backs.join(' ') || '无'}）`);
-  ok(await page.evaluate(() => pinDelta) > 60, '4h 迟滞宽度用的是实测高度差，不是猜的数');
+  const dm = await page.evaluate(() => ({ d: pinDelta, loose: pinLooseH, tight: pinTightH }));
+  ok(dm.d > 20 && Math.abs(dm.d - Math.abs(dm.loose - dm.tight)) < 1.5,
+    `4h 迟滞宽度 = 实测高度差（${dm.d.toFixed(1)} = ${dm.loose.toFixed(1)} − ${dm.tight.toFixed(1)}）`);
   await page.waitForTimeout(200);
   const c = await page.evaluate(ruler);
   ok(c.scrollY <= 2, `4i 点击后回到顶部（scrollY=${c.scrollY}）`);
